@@ -5,23 +5,13 @@ import ChapterList from '@/components/ChapterList';
 import ReaderView from '@/components/ReaderView';
 import NovelToolbar from '@/components/NovelToolbar';
 import { exportToPdf, exportToDocx } from '@/lib/export-utils';
+import { scrapeNovelInfo, scrapeChapterContent } from '@/lib/api/firecrawl';
 import {
   type Novel,
   type Chapter,
   saveNovel,
-  getLibrary,
   generateId,
 } from '@/lib/novel-store';
-
-// Demo data for initial experience (since scraping needs backend)
-const DEMO_CHAPTERS: Chapter[] = Array.from({ length: 20 }, (_, i) => ({
-  id: `ch-${i + 1}`,
-  title: `Chapter ${i + 1}`,
-  url: `#chapter-${i + 1}`,
-  content: i < 3
-    ? `This is a demo preview of Chapter ${i + 1} of "Swallowed Star".\n\nIn the year 2056, a catastrophe swept the world. Monsters appeared and civilization trembled. Among the survivors, warriors rose to protect humanity.\n\nLuo Feng, an eighteen-year-old, trained relentlessly in martial arts. His dream was to become a fighter — one of the elite warriors who ventured into the wilderness to battle the monsters that threatened human civilization.\n\nThe world had changed forever, but in that change, new possibilities emerged. Powers beyond human comprehension awaited those brave enough to seek them.\n\n"To connect to the actual novel content, enable Lovable Cloud and the Firecrawl connector to scrape the source website."`
-    : undefined,
-}));
 
 const Index = () => {
   const [novel, setNovel] = useState<Novel | null>(null);
@@ -31,47 +21,62 @@ const Index = () => {
 
   const handleFetchNovel = useCallback(async (url: string) => {
     setIsLoadingNovel(true);
-
-    // For now, create a demo novel since scraping needs Cloud + Firecrawl
-    setTimeout(() => {
+    try {
+      const info = await scrapeNovelInfo(url);
       const newNovel: Novel = {
         id: generateId(),
-        title: 'Swallowed Star',
+        title: info.title,
         url,
-        description: 'In the year 2056, a catastrophe swept the world...',
-        chapters: DEMO_CHAPTERS,
+        coverUrl: info.coverUrl,
+        description: info.description,
+        chapters: info.chapters.map(ch => ({
+          id: ch.id,
+          title: ch.title,
+          url: ch.url,
+        })),
         savedAt: new Date().toISOString(),
       };
       setNovel(newNovel);
+      toast.success(`Loaded "${info.title}" with ${info.chapters.length} chapters!`);
+    } catch (err) {
+      console.error('Failed to fetch novel:', err);
+      toast.error(err instanceof Error ? err.message : 'Failed to fetch novel');
+    } finally {
       setIsLoadingNovel(false);
-      toast.success('Novel loaded! Select a chapter to read.');
-    }, 1000);
+    }
   }, []);
 
-  const handleSelectChapter = useCallback((chapter: Chapter) => {
+  const handleSelectChapter = useCallback(async (chapter: Chapter) => {
     if (chapter.content) {
       setActiveChapter(chapter);
-    } else {
-      setIsLoadingChapter(true);
-      setActiveChapter(chapter);
-      // Simulate fetch — real implementation would use Firecrawl
-      setTimeout(() => {
-        const updated = {
-          ...chapter,
-          content: `Content for "${chapter.title}" would be fetched from the source website using Firecrawl.\n\nTo enable real scraping, connect Lovable Cloud and add the Firecrawl connector.\n\nThis demo shows the reading experience you'll get once connected.`,
-          savedAt: new Date().toISOString(),
-        };
-        setActiveChapter(updated);
-        if (novel) {
-          const updatedChapters = novel.chapters.map(c =>
-            c.id === chapter.id ? updated : c
-          );
-          setNovel({ ...novel, chapters: updatedChapters });
-        }
-        setIsLoadingChapter(false);
-      }, 800);
+      return;
     }
-  }, [novel]);
+
+    setIsLoadingChapter(true);
+    setActiveChapter(chapter);
+
+    try {
+      const content = await scrapeChapterContent(chapter.url);
+      const updated: Chapter = {
+        ...chapter,
+        content,
+        savedAt: new Date().toISOString(),
+      };
+      setActiveChapter(updated);
+      setNovel(prev => {
+        if (!prev) return prev;
+        return {
+          ...prev,
+          chapters: prev.chapters.map(c => c.id === chapter.id ? updated : c),
+        };
+      });
+    } catch (err) {
+      console.error('Failed to fetch chapter:', err);
+      toast.error(err instanceof Error ? err.message : 'Failed to fetch chapter');
+    } finally {
+      setIsLoadingChapter(false);
+    }
+  }, []);
 
   const activeIndex = novel?.chapters.findIndex(c => c.id === activeChapter?.id) ?? -1;
 
