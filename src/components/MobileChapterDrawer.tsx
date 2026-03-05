@@ -3,15 +3,28 @@ import { Button } from '@/components/ui/button';
 import { Menu } from 'lucide-react';
 import ChapterList from './ChapterList';
 import type { Chapter } from '@/lib/novel-store';
+import type { Bookmark } from '@/lib/bookmarks';
 import { useState } from 'react';
 
 interface MobileChapterDrawerProps {
   chapters: Chapter[];
   activeChapterId?: string;
   onSelectChapter: (chapter: Chapter) => void;
+  bookmarks?: Bookmark[];
+  onJumpToBookmark?: (chapterId: string, scrollPosition: number) => void;
+  onRemoveBookmark?: (id: string) => void;
+  bookmarkedChapterIds?: Set<string>;
 }
 
-const MobileChapterDrawer = ({ chapters, activeChapterId, onSelectChapter }: MobileChapterDrawerProps) => {
+const MobileChapterDrawer = ({
+  chapters,
+  activeChapterId,
+  onSelectChapter,
+  bookmarks,
+  onJumpToBookmark,
+  onRemoveBookmark,
+  bookmarkedChapterIds,
+}: MobileChapterDrawerProps) => {
   const [open, setOpen] = useState(false);
 
   return (
@@ -33,6 +46,13 @@ const MobileChapterDrawer = ({ chapters, activeChapterId, onSelectChapter }: Mob
               onSelectChapter(ch);
               setOpen(false);
             }}
+            bookmarks={bookmarks}
+            onJumpToBookmark={(chapterId, scrollPosition) => {
+              onJumpToBookmark?.(chapterId, scrollPosition);
+              setOpen(false);
+            }}
+            onRemoveBookmark={onRemoveBookmark}
+            bookmarkedChapterIds={bookmarkedChapterIds}
           />
         </div>
       </SheetContent>

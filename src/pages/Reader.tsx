@@ -201,6 +201,10 @@ const Reader = () => {
             chapters={novel.chapters}
             activeChapterId={activeChapter?.id}
             onSelectChapter={handleSelectChapter}
+            bookmarks={bookmarks}
+            onJumpToBookmark={handleJumpToBookmark}
+            onRemoveBookmark={handleRemoveBookmark}
+            bookmarkedChapterIds={bookmarkedChapterIds}
           />
         }
       />
