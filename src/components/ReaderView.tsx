@@ -27,8 +27,8 @@ const ReaderView = ({ chapter, isLoading, onPrevChapter, onNextChapter, hasPrev,
   if (!chapter) {
     return (
       <div className="flex items-center justify-center h-full bg-reader">
-        <div className="text-center animate-fade-in">
-          <p className="text-muted-foreground font-sans-ui text-lg">
+        <div className="text-center animate-fade-in px-4">
+          <p className="text-muted-foreground font-sans-ui text-base sm:text-lg">
             Select a chapter to start reading
           </p>
         </div>
@@ -39,46 +39,34 @@ const ReaderView = ({ chapter, isLoading, onPrevChapter, onNextChapter, hasPrev,
   return (
     <div className="flex flex-col h-full bg-reader">
       <ScrollArea className="flex-1 scrollbar-thin">
-        <div className="max-w-2xl mx-auto px-8 py-12 animate-fade-in">
-          <h2 className="font-sans-ui text-2xl font-bold mb-8 text-foreground">
+        <div className="max-w-2xl mx-auto px-4 sm:px-8 py-6 sm:py-12 animate-fade-in">
+          <h2 className="font-sans-ui text-xl sm:text-2xl font-bold mb-6 sm:mb-8 text-foreground">
             {chapter.title}
           </h2>
           {chapter.content ? (
-            <div className="font-serif-reader text-reader leading-[1.9] text-[1.1rem] space-y-4">
+            <div className="font-serif-reader text-reader leading-[1.8] sm:leading-[1.9] text-base sm:text-[1.1rem] space-y-4">
               {chapter.content.split('\n\n').map((para, i) => (
                 para.trim() && <p key={i}>{para.trim()}</p>
               ))}
             </div>
           ) : (
             <p className="text-muted-foreground font-sans-ui italic">
-              Chapter content not yet fetched. Click "Fetch" to load this chapter.
+              Chapter content not yet fetched.
             </p>
           )}
         </div>
       </ScrollArea>
 
-      {/* Navigation */}
-      <div className="border-t border-border px-6 py-3 flex items-center justify-between bg-card/50">
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={onPrevChapter}
-          disabled={!hasPrev}
-          className="font-sans-ui"
-        >
+      <div className="border-t border-border px-3 sm:px-6 py-3 flex items-center justify-between bg-card/50">
+        <Button variant="ghost" size="sm" onClick={onPrevChapter} disabled={!hasPrev} className="font-sans-ui">
           <ChevronLeft className="w-4 h-4 mr-1" />
-          Previous
+          <span className="hidden sm:inline">Previous</span>
+          <span className="sm:hidden">Prev</span>
         </Button>
-        <span className="text-xs text-muted-foreground font-sans-ui">
+        <span className="text-xs text-muted-foreground font-sans-ui truncate max-w-[40%] text-center">
           {chapter.title}
         </span>
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={onNextChapter}
-          disabled={!hasNext}
-          className="font-sans-ui"
-        >
+        <Button variant="ghost" size="sm" onClick={onNextChapter} disabled={!hasNext} className="font-sans-ui">
           Next
           <ChevronRight className="w-4 h-4 ml-1" />
         </Button>

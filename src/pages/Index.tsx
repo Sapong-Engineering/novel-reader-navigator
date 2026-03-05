@@ -1,23 +1,22 @@
 import { useState, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import NovelUrlInput from '@/components/NovelUrlInput';
-import ChapterList from '@/components/ChapterList';
-import ReaderView from '@/components/ReaderView';
-import NovelToolbar from '@/components/NovelToolbar';
-import { exportToPdf, exportToDocx } from '@/lib/export-utils';
-import { scrapeNovelInfo, scrapeChapterContent } from '@/lib/api/firecrawl';
+import NovelCard from '@/components/NovelCard';
+import { scrapeNovelInfo } from '@/lib/api/firecrawl';
 import {
   type Novel,
-  type Chapter,
+  getLibrary,
   saveNovel,
+  deleteNovel,
   generateId,
 } from '@/lib/novel-store';
+import { BookOpen } from 'lucide-react';
 
 const Index = () => {
-  const [novel, setNovel] = useState<Novel | null>(null);
-  const [activeChapter, setActiveChapter] = useState<Chapter | null>(null);
+  const navigate = useNavigate();
   const [isLoadingNovel, setIsLoadingNovel] = useState(false);
-  const [isLoadingChapter, setIsLoadingChapter] = useState(false);
+  const [library, setLibrary] = useState<Novel[]>(() => getLibrary());
 
   const handleFetchNovel = useCallback(async (url: string) => {
     setIsLoadingNovel(true);
@@ -36,7 +35,9 @@ const Index = () => {
         })),
         savedAt: new Date().toISOString(),
       };
-      setNovel(newNovel);
+      saveNovel(newNovel);
+      setLibrary(getLibrary());
+      navigate(`/reader/${newNovel.id}`);
       toast.success(`Loaded "${info.title}" with ${info.chapters.length} chapters!`);
     } catch (err) {
       console.error('Failed to fetch novel:', err);
@@ -44,126 +45,56 @@ const Index = () => {
     } finally {
       setIsLoadingNovel(false);
     }
+  }, [navigate]);
+
+  const handleOpenNovel = useCallback((novel: Novel) => {
+    navigate(`/reader/${novel.id}`);
+  }, [navigate]);
+
+  const handleDeleteNovel = useCallback((id: string) => {
+    deleteNovel(id);
+    setLibrary(getLibrary());
+    toast.success('Novel removed from library');
   }, []);
-
-  const handleSelectChapter = useCallback(async (chapter: Chapter) => {
-    if (chapter.content) {
-      setActiveChapter(chapter);
-      return;
-    }
-
-    setIsLoadingChapter(true);
-    setActiveChapter(chapter);
-
-    try {
-      const content = await scrapeChapterContent(chapter.url);
-      const updated: Chapter = {
-        ...chapter,
-        content,
-        savedAt: new Date().toISOString(),
-      };
-      setActiveChapter(updated);
-      setNovel(prev => {
-        if (!prev) return prev;
-        return {
-          ...prev,
-          chapters: prev.chapters.map(c => c.id === chapter.id ? updated : c),
-        };
-      });
-    } catch (err) {
-      console.error('Failed to fetch chapter:', err);
-      toast.error(err instanceof Error ? err.message : 'Failed to fetch chapter');
-    } finally {
-      setIsLoadingChapter(false);
-    }
-  }, []);
-
-  const activeIndex = novel?.chapters.findIndex(c => c.id === activeChapter?.id) ?? -1;
-
-  const handlePrev = useCallback(() => {
-    if (novel && activeIndex > 0) {
-      handleSelectChapter(novel.chapters[activeIndex - 1]);
-    }
-  }, [novel, activeIndex, handleSelectChapter]);
-
-  const handleNext = useCallback(() => {
-    if (novel && activeIndex < novel.chapters.length - 1) {
-      handleSelectChapter(novel.chapters[activeIndex + 1]);
-    }
-  }, [novel, activeIndex, handleSelectChapter]);
-
-  const handleSave = useCallback(() => {
-    if (novel) {
-      saveNovel(novel);
-      toast.success('Novel saved to library!');
-    }
-  }, [novel]);
-
-  const handleExportPdf = useCallback(async () => {
-    if (!novel) return;
-    const saved = novel.chapters.filter(c => c.content);
-    if (saved.length === 0) {
-      toast.error('No chapters to export. Fetch some chapters first.');
-      return;
-    }
-    await exportToPdf(novel.title, saved);
-    toast.success('PDF downloaded!');
-  }, [novel]);
-
-  const handleExportDocx = useCallback(async () => {
-    if (!novel) return;
-    const saved = novel.chapters.filter(c => c.content);
-    if (saved.length === 0) {
-      toast.error('No chapters to export. Fetch some chapters first.');
-      return;
-    }
-    await exportToDocx(novel.title, saved);
-    toast.success('DOCX downloaded!');
-  }, [novel]);
-
-  // Landing / URL input view
-  if (!novel) {
-    return (
-      <div className="min-h-screen flex items-center justify-center p-6 bg-background">
-        <NovelUrlInput onSubmit={handleFetchNovel} isLoading={isLoadingNovel} />
-      </div>
-    );
-  }
-
-  // Reader view
-  const savedCount = novel.chapters.filter(c => c.content).length;
 
   return (
-    <div className="h-screen flex flex-col bg-background">
-      <NovelToolbar
-        title={novel.title}
-        chapterCount={novel.chapters.length}
-        savedCount={savedCount}
-        onExportPdf={handleExportPdf}
-        onExportDocx={handleExportDocx}
-        onSave={handleSave}
-        onBack={() => { setNovel(null); setActiveChapter(null); }}
-      />
-      <div className="flex-1 flex overflow-hidden">
-        {/* Sidebar */}
-        <div className="w-72 border-r border-border bg-card flex-shrink-0 hidden md:flex flex-col">
-          <ChapterList
-            chapters={novel.chapters}
-            activeChapterId={activeChapter?.id}
-            onSelectChapter={handleSelectChapter}
-          />
+    <div className="min-h-screen bg-background">
+      {/* Hero Section */}
+      <div className="flex items-center justify-center px-4 py-12 sm:py-20">
+        <NovelUrlInput onSubmit={handleFetchNovel} isLoading={isLoadingNovel} />
+      </div>
+
+      {/* Library Section */}
+      <div className="max-w-6xl mx-auto px-4 pb-12">
+        <div className="flex items-center gap-2 mb-6">
+          <BookOpen className="w-5 h-5 text-primary" />
+          <h2 className="font-sans-ui font-semibold text-lg text-foreground">Your Library</h2>
+          {library.length > 0 && (
+            <span className="text-xs text-muted-foreground font-sans-ui ml-1">
+              ({library.length} {library.length === 1 ? 'novel' : 'novels'})
+            </span>
+          )}
         </div>
-        {/* Reader */}
-        <div className="flex-1">
-          <ReaderView
-            chapter={activeChapter}
-            isLoading={isLoadingChapter}
-            onPrevChapter={handlePrev}
-            onNextChapter={handleNext}
-            hasPrev={activeIndex > 0}
-            hasNext={activeIndex < novel.chapters.length - 1}
-          />
-        </div>
+
+        {library.length === 0 ? (
+          <div className="text-center py-16 border border-dashed border-border rounded-xl">
+            <BookOpen className="w-10 h-10 text-muted-foreground/30 mx-auto mb-3" />
+            <p className="text-muted-foreground font-sans-ui text-sm">
+              No saved novels yet. Paste a URL above to get started.
+            </p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
+            {library.map(novel => (
+              <NovelCard
+                key={novel.id}
+                novel={novel}
+                onOpen={handleOpenNovel}
+                onDelete={handleDeleteNovel}
+              />
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );
