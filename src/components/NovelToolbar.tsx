@@ -8,6 +8,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Progress } from '@/components/ui/progress';
+import { ReaderSettingsPopover } from '@/components/reader/ReaderSettingsPopover';
 
 interface NovelToolbarProps {
   title: string;
@@ -21,6 +22,7 @@ interface NovelToolbarProps {
   isFetchingAll?: boolean;
   fetchProgress?: { current: number; total: number };
   mobileChapterDrawer?: ReactNode;
+  showReaderSettings?: boolean;
 }
 
 const NovelToolbar = ({
@@ -35,6 +37,7 @@ const NovelToolbar = ({
   isFetchingAll,
   fetchProgress,
   mobileChapterDrawer,
+  showReaderSettings = false,
 }: NovelToolbarProps) => {
   const progressPercent = fetchProgress?.total ? (fetchProgress.current / fetchProgress.total) * 100 : 0;
 
@@ -76,6 +79,8 @@ const NovelToolbar = ({
             {isFetchingAll ? `${fetchProgress?.current}/${fetchProgress?.total}` : 'Fetch All'}
           </Button>
         )}
+
+        {showReaderSettings && <ReaderSettingsPopover />}
 
         <Button variant="outline" size="sm" onClick={onSave} className="font-sans-ui hidden sm:inline-flex">
           <Save className="w-4 h-4 mr-2" />

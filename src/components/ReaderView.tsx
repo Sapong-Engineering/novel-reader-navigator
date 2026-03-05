@@ -1,8 +1,9 @@
-import { useRef, useEffect } from 'react';
-import { ScrollArea } from '@/components/ui/scroll-area';
+import { useRef, useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { ChevronLeft, ChevronRight, Loader2 } from 'lucide-react';
+import { Input } from '@/components/ui/input';
+import { ChevronLeft, ChevronRight, Loader2, Bookmark, BookmarkCheck } from 'lucide-react';
 import type { Chapter } from '@/lib/novel-store';
+import type { Bookmark as BookmarkType } from '@/lib/bookmarks';
 
 interface ReaderViewProps {
   chapter: Chapter | null;
@@ -13,6 +14,9 @@ interface ReaderViewProps {
   hasNext?: boolean;
   onScroll?: (scrollTop: number) => void;
   onChapterReady?: (container: HTMLElement) => Promise<void>;
+  chapterBookmarks?: BookmarkType[];
+  onAddBookmark?: (scrollPosition: number, label?: string) => void;
+  onRemoveBookmark?: (id: string) => void;
 }
 
 const ReaderView = ({
@@ -24,21 +28,55 @@ const ReaderView = ({
   hasNext,
   onScroll,
   onChapterReady,
+  chapterBookmarks = [],
+  onAddBookmark,
+  onRemoveBookmark,
 }: ReaderViewProps) => {
   const scrollRef = useRef<HTMLDivElement>(null);
+  const [currentScrollTop, setCurrentScrollTop] = useState(0);
+  const [showLabelInput, setShowLabelInput] = useState(false);
+  const [labelDraft, setLabelDraft] = useState('');
 
   useEffect(() => {
     const el = scrollRef.current;
     if (!el || !chapter) return;
 
+    setCurrentScrollTop(0);
     onChapterReady?.(el);
 
     const handleScroll = () => {
-      onScroll?.(el.scrollTop);
+      const top = el.scrollTop;
+      setCurrentScrollTop(top);
+      onScroll?.(top);
     };
     el.addEventListener('scroll', handleScroll, { passive: true });
     return () => el.removeEventListener('scroll', handleScroll);
   }, [chapter?.id, onChapterReady, onScroll]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const nearbyBookmark = chapterBookmarks.find(
+    b => Math.abs(b.scrollPosition - currentScrollTop) <= 50,
+  );
+  const isBookmarked = Boolean(nearbyBookmark);
+
+  const handleBookmarkToggle = () => {
+    if (isBookmarked && nearbyBookmark) {
+      onRemoveBookmark?.(nearbyBookmark.id);
+    } else {
+      setShowLabelInput(true);
+      setLabelDraft('');
+    }
+  };
+
+  const handleConfirmBookmark = () => {
+    onAddBookmark?.(currentScrollTop, labelDraft || undefined);
+    setShowLabelInput(false);
+    setLabelDraft('');
+  };
+
+  const handleCancelBookmark = () => {
+    setShowLabelInput(false);
+    setLabelDraft('');
+  };
 
   if (isLoading) {
     return (
@@ -93,15 +131,57 @@ const ReaderView = ({
         </div>
       </div>
 
+      {/* Inline bookmark label input */}
+      {showLabelInput && (
+        <div className="border-t border-border px-3 sm:px-6 py-2 flex items-center gap-2 bg-card/70">
+          <Input
+            value={labelDraft}
+            onChange={e => setLabelDraft(e.target.value)}
+            placeholder="Bookmark label (optional)"
+            className="h-7 text-sm font-sans-ui flex-1"
+            onKeyDown={e => {
+              if (e.key === 'Enter') handleConfirmBookmark();
+              if (e.key === 'Escape') handleCancelBookmark();
+            }}
+            autoFocus
+          />
+          <Button size="sm" className="h-7 text-xs font-sans-ui" onClick={handleConfirmBookmark}>
+            Save
+          </Button>
+          <Button size="sm" variant="ghost" className="h-7 text-xs font-sans-ui" onClick={handleCancelBookmark}>
+            Cancel
+          </Button>
+        </div>
+      )}
+
       <div className="border-t border-border px-3 sm:px-6 py-3 flex items-center justify-between bg-card/50">
         <Button variant="ghost" size="sm" onClick={onPrevChapter} disabled={!hasPrev} className="font-sans-ui">
           <ChevronLeft className="w-4 h-4 mr-1" />
           <span className="hidden sm:inline">Previous</span>
           <span className="sm:hidden">Prev</span>
         </Button>
-        <span className="text-xs text-muted-foreground font-sans-ui truncate max-w-[40%] text-center">
-          {chapter.title}
-        </span>
+
+        <div className="flex items-center gap-1.5">
+          {onAddBookmark && (
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-7 w-7 flex-shrink-0"
+              onClick={handleBookmarkToggle}
+              title={isBookmarked ? 'Remove bookmark' : 'Add bookmark'}
+            >
+              {isBookmarked ? (
+                <BookmarkCheck className="w-4 h-4 text-primary" />
+              ) : (
+                <Bookmark className="w-4 h-4 text-muted-foreground" />
+              )}
+            </Button>
+          )}
+          <span className="text-xs text-muted-foreground font-sans-ui truncate max-w-[120px] sm:max-w-[200px] text-center">
+            {chapter.title}
+          </span>
+        </div>
+
         <Button variant="ghost" size="sm" onClick={onNextChapter} disabled={!hasNext} className="font-sans-ui">
           Next
           <ChevronRight className="w-4 h-4 ml-1" />

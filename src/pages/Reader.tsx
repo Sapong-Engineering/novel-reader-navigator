@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import ChapterList from '@/components/ChapterList';
@@ -11,6 +11,7 @@ import { exportToPdfWithProgress, exportToDocxWithProgress } from '@/lib/export-
 import { useChapterNavigation } from '@/hooks/useChapterNavigation';
 import { useChapterFetcher } from '@/hooks/useChapterFetcher';
 import { useReadingProgress } from '@/hooks/useReadingProgress';
+import { useBookmarks } from '@/hooks/useBookmarks';
 import { validateUrl } from '@/lib/validation';
 import { scrapeChapterContent } from '@/lib/api/firecrawl';
 
@@ -20,8 +21,10 @@ const Reader = () => {
   const [novel, setNovel] = useState<Novel | null>(null);
   const [activeChapter, setActiveChapter] = useState<Chapter | null>(null);
   const [isLoadingChapter, setIsLoadingChapter] = useState(false);
+  // Pending scroll restore after a jump-to-bookmark navigation
+  const pendingScrollRef = useRef<number | null>(null);
 
-  const { isFetching: isFetchingAll, progress: fetchProgress, fetchAll, cancel: cancelFetch } = useChapterFetcher();
+  const { isFetching: isFetchingAll, progress: fetchProgress, fetchAll } = useChapterFetcher();
   const { hasPrev, hasNext, goToPrev, goToNext } = useChapterNavigation(
     novel?.chapters ?? [],
     activeChapter,
@@ -34,12 +37,19 @@ const Reader = () => {
     activeChapter?.id,
   );
 
+  const {
+    bookmarks,
+    addChapterBookmark,
+    removeBookmark,
+    isChapterBookmarked,
+    getChapterBookmarks,
+  } = useBookmarks(novelIdStr);
+
   useEffect(() => {
     if (novelId) {
       const stored = getNovel(novelId);
       if (stored) {
         setNovel(stored);
-        // Auto-open last read chapter
         const lastReadId = getLastRead();
         if (lastReadId) {
           const lastChapter = stored.chapters.find(c => c.id === lastReadId);
@@ -89,6 +99,48 @@ const Reader = () => {
     }
   }
 
+  const handleJumpToBookmark = useCallback(
+    async (chapterId: string, scrollPosition: number) => {
+      if (!novel) return;
+      const chapter = novel.chapters.find(c => c.id === chapterId);
+      if (!chapter) return;
+      pendingScrollRef.current = scrollPosition;
+      await handleSelectChapter(chapter);
+    },
+    [novel], // eslint-disable-line react-hooks/exhaustive-deps
+  );
+
+  // Custom restoreProgress that also handles pending bookmark scroll
+  const handleChapterReady = useCallback(
+    async (container: HTMLElement) => {
+      const pending = pendingScrollRef.current;
+      if (pending !== null) {
+        pendingScrollRef.current = null;
+        container.scrollTop = pending;
+      } else {
+        await restoreProgress(container);
+      }
+    },
+    [restoreProgress],
+  );
+
+  const handleAddBookmark = useCallback(
+    (scrollPosition: number, label?: string) => {
+      if (!activeChapter) return;
+      addChapterBookmark(activeChapter, scrollPosition, label);
+      toast.success(label ? `Bookmarked: "${label}"` : 'Bookmark added');
+    },
+    [activeChapter, addChapterBookmark],
+  );
+
+  const handleRemoveBookmark = useCallback(
+    (id: string) => {
+      removeBookmark(id);
+      toast.success('Bookmark removed');
+    },
+    [removeBookmark],
+  );
+
   const handleFetchAll = useCallback(async () => {
     if (!novel || isFetchingAll) return;
     await fetchAll(novel, setNovel);
@@ -125,6 +177,10 @@ const Reader = () => {
   }
 
   const savedCount = novel.chapters.filter(c => c.content).length;
+  const chapterBookmarks = activeChapter
+    ? getChapterBookmarks(activeChapter.id)
+    : [];
+  const bookmarkedChapterIds = new Set(bookmarks.map(b => b.chapterId));
 
   return (
     <div className="h-screen flex flex-col bg-background">
@@ -139,6 +195,7 @@ const Reader = () => {
         onFetchAll={handleFetchAll}
         isFetchingAll={isFetchingAll}
         fetchProgress={fetchProgress}
+        showReaderSettings
         mobileChapterDrawer={
           <MobileChapterDrawer
             chapters={novel.chapters}
@@ -154,6 +211,10 @@ const Reader = () => {
               chapters={novel.chapters}
               activeChapterId={activeChapter?.id}
               onSelectChapter={handleSelectChapter}
+              bookmarks={bookmarks}
+              onJumpToBookmark={handleJumpToBookmark}
+              onRemoveBookmark={handleRemoveBookmark}
+              bookmarkedChapterIds={bookmarkedChapterIds}
             />
           </ErrorBoundary>
         </div>
@@ -167,7 +228,10 @@ const Reader = () => {
               hasPrev={hasPrev}
               hasNext={hasNext}
               onScroll={saveProgress}
-              onChapterReady={restoreProgress}
+              onChapterReady={handleChapterReady}
+              chapterBookmarks={chapterBookmarks}
+              onAddBookmark={handleAddBookmark}
+              onRemoveBookmark={handleRemoveBookmark}
             />
           </ErrorBoundary>
         </div>
