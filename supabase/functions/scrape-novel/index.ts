@@ -1,7 +1,13 @@
+import { AdapterRegistry } from './adapters/types.ts';
+import { DefaultAdapter } from './adapters/default-adapter.ts';
+import { novelInfoCache, Cache } from '../shared/cache.ts';
+
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version',
 };
+
+const registry = new AdapterRegistry(new DefaultAdapter());
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -31,6 +37,17 @@ Deno.serve(async (req) => {
       formattedUrl = `https://${formattedUrl}`;
     }
 
+    // Check cache first
+    const cacheKey = Cache.keyFromUrl(formattedUrl);
+    const cached = novelInfoCache.get(cacheKey);
+    if (cached) {
+      console.log('Cache hit for:', formattedUrl);
+      return new Response(
+        JSON.stringify({ success: true, data: cached }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
     console.log('Scraping novel page:', formattedUrl);
 
     const response = await fetch('https://api.firecrawl.dev/v1/scrape', {
@@ -56,71 +73,26 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Parse the novel info from markdown
-    const markdown = data.data?.markdown || data.markdown || '';
-    const links = data.data?.links || data.links || [];
-    const metadata = data.data?.metadata || data.metadata || {};
+    const markdown: string = data.data?.markdown || data.markdown || '';
+    const links: string[] = data.data?.links || data.links || [];
+    const metadata: Record<string, string> = data.data?.metadata || data.metadata || {};
 
-    // Extract title from first heading
-    const titleMatch = markdown.match(/^#\s+(.+)$/m);
-    const title = titleMatch ? titleMatch[1].trim() : metadata.title || 'Unknown Novel';
+    const adapter = registry.getAdapter(formattedUrl);
+    const novelInfo = adapter.extractNovelInfo({
+      baseUrl: formattedUrl,
+      markdown,
+      links,
+      metadata,
+    });
 
-    // Extract description from Summary section
-    const summaryMatch = markdown.match(/\*\*Summary\*\*(.+?)(?:\n\n|\[First Chapter)/s);
-    const description = summaryMatch ? summaryMatch[1].trim() : '';
+    console.log(`Found ${novelInfo.chapters.length} chapters for "${novelInfo.title}"`);
 
-    // Extract cover image
-    const coverMatch = markdown.match(/!\[.*?\]\((.*?cover.*?)\)/i);
-    const coverUrl = coverMatch ? coverMatch[1] : undefined;
-
-    // Extract chapter URLs - find all links that match the novel chapter pattern
-    // URLs look like: https://www.empirenovel.com/novel/swallowed-star/123
-    const baseUrl = formattedUrl.replace(/\/$/, '');
-    const chapterPattern = new RegExp(`^${baseUrl.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}/(\\d+)$`);
-    
-    const chapterNumbers: number[] = [];
-    for (const link of links) {
-      const match = link.match(chapterPattern);
-      if (match) {
-        chapterNumbers.push(parseInt(match[1], 10));
-      }
-    }
-
-    // Also try to extract from markdown content (chapter links in text)
-    const chapterLinkPattern = new RegExp(`${baseUrl.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}/(\\d+)`, 'g');
-    let linkMatch;
-    while ((linkMatch = chapterLinkPattern.exec(markdown)) !== null) {
-      const num = parseInt(linkMatch[1], 10);
-      if (!chapterNumbers.includes(num)) {
-        chapterNumbers.push(num);
-      }
-    }
-
-    // Determine total chapter count from first/last chapter info
-    let maxChapter = chapterNumbers.length > 0 ? Math.max(...chapterNumbers) : 0;
-    const lastChapterMatch = markdown.match(/Chapter\s+(\d+)\]/);
-    if (lastChapterMatch) {
-      const n = parseInt(lastChapterMatch[1], 10);
-      if (n > maxChapter) maxChapter = n;
-    }
-
-    // Generate full chapter list
-    const chapters = [];
-    for (let i = 1; i <= maxChapter; i++) {
-      chapters.push({
-        id: `ch-${i}`,
-        title: `Chapter ${i}`,
-        url: `${baseUrl}/${i}`,
-      });
-    }
-
-    console.log(`Found ${chapters.length} chapters for "${title}"`);
+    // Store in cache for future requests
+    const cacheKey = Cache.keyFromUrl(formattedUrl);
+    novelInfoCache.set(cacheKey, novelInfo);
 
     return new Response(
-      JSON.stringify({
-        success: true,
-        data: { title, description, coverUrl, chapters },
-      }),
+      JSON.stringify({ success: true, data: novelInfo }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   } catch (error) {

@@ -1,0 +1,137 @@
+import { getLibrary, saveNovel, type Novel } from './novel-store';
+
+export interface StorageQuota {
+  usedBytes: number;
+  totalBytes: number;
+  usagePercent: number;
+  isWarning: boolean;
+  isExceeded: boolean;
+}
+
+const WARNING_THRESHOLD = 0.8; // 80%
+const STORAGE_KEY = 'novel-reader-library';
+
+export class StorageQuotaExceededError extends Error {
+  constructor(
+    public readonly used: number,
+    public readonly available: number,
+    public readonly needed: number,
+  ) {
+    super(
+      `Storage quota exceeded. Used: ${formatBytes(used)}, ` +
+        `Available: ${formatBytes(available)}, Needed: ${formatBytes(needed)}. ` +
+        `Try removing some novels to free up space.`,
+    );
+    this.name = 'StorageQuotaExceededError';
+  }
+}
+
+function formatBytes(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
+}
+
+export async function getQuota(): Promise<StorageQuota> {
+  let totalBytes = 5 * 1024 * 1024; // Default 5 MB localStorage estimate
+  let usedBytes = 0;
+
+  try {
+    if ('storage' in navigator && 'estimate' in navigator.storage) {
+      const estimate = await navigator.storage.estimate();
+      totalBytes = estimate.quota ?? totalBytes;
+      usedBytes = estimate.usage ?? 0;
+    } else {
+      // Estimate from localStorage
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if (key) {
+          usedBytes += (localStorage.getItem(key) ?? '').length * 2; // UTF-16
+        }
+      }
+    }
+  } catch {
+    // Fallback: estimate from localStorage size
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (key) {
+        usedBytes += (localStorage.getItem(key) ?? '').length * 2;
+      }
+    }
+  }
+
+  const usagePercent = totalBytes > 0 ? usedBytes / totalBytes : 0;
+  return {
+    usedBytes,
+    totalBytes,
+    usagePercent,
+    isWarning: usagePercent >= WARNING_THRESHOLD,
+    isExceeded: usagePercent >= 1,
+  };
+}
+
+export function calculateNovelSize(novel: Novel): number {
+  return JSON.stringify(novel).length * 2; // UTF-16 bytes
+}
+
+export async function saveNovelWithQuotaCheck(novel: Novel): Promise<void> {
+  const novelJson = JSON.stringify(novel);
+  const neededBytes = novelJson.length * 2;
+
+  // Check existing library size
+  const existingData = localStorage.getItem(STORAGE_KEY) ?? '[]';
+  const existingSizeBytes = existingData.length * 2;
+
+  // Estimate available space (use 5MB as conservative localStorage limit)
+  const maxBytes = 5 * 1024 * 1024;
+  const otherStorageBytes = (() => {
+    let total = 0;
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (key && key !== STORAGE_KEY) {
+        total += (localStorage.getItem(key) ?? '').length * 2;
+      }
+    }
+    return total;
+  })();
+
+  const availableBytes = maxBytes - otherStorageBytes - existingSizeBytes + calculateNovelSize(
+    getLibrary().find(n => n.id === novel.id) ?? novel,
+  );
+
+  if (neededBytes > availableBytes) {
+    throw new StorageQuotaExceededError(
+      maxBytes - availableBytes,
+      availableBytes,
+      neededBytes,
+    );
+  }
+
+  saveNovel(novel);
+}
+
+export async function getReadingProgress(
+  novelId: string,
+  chapterId: string,
+): Promise<number> {
+  const key = `reading-progress:${novelId}:${chapterId}`;
+  const stored = localStorage.getItem(key);
+  return stored ? parseFloat(stored) : 0;
+}
+
+export function saveReadingProgress(
+  novelId: string,
+  chapterId: string,
+  scrollPosition: number,
+): void {
+  const key = `reading-progress:${novelId}:${chapterId}`;
+  localStorage.setItem(key, String(scrollPosition));
+}
+
+export function getLastReadChapter(novelId: string): string | null {
+  return localStorage.getItem(`last-read:${novelId}`);
+}
+
+export function saveLastReadChapter(novelId: string, chapterId: string): void {
+  localStorage.setItem(`last-read:${novelId}`, chapterId);
+}

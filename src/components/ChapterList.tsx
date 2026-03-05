@@ -1,6 +1,9 @@
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Check, BookmarkCheck } from 'lucide-react';
+import { Input } from '@/components/ui/input';
+import { BookmarkCheck, Search, X } from 'lucide-react';
 import type { Chapter } from '@/lib/novel-store';
+import { useChapterSearch } from '@/hooks/useChapterSearch';
+import { Button } from '@/components/ui/button';
 
 interface ChapterListProps {
   chapters: Chapter[];
@@ -9,16 +12,43 @@ interface ChapterListProps {
 }
 
 const ChapterList = ({ chapters, activeChapterId, onSelectChapter }: ChapterListProps) => {
+  const { searchQuery, setSearchQuery, filteredChapters, resultCount, clearSearch, highlightMatch } =
+    useChapterSearch(chapters);
+
   return (
     <div className="flex flex-col h-full">
-      <div className="p-4 border-b border-border">
+      <div className="p-4 border-b border-border space-y-2">
         <h2 className="font-sans-ui font-semibold text-sm uppercase tracking-wider text-muted-foreground">
           Chapters ({chapters.length})
         </h2>
+        <div className="relative">
+          <Search className="absolute left-2.5 top-2.5 w-3.5 h-3.5 text-muted-foreground" />
+          <Input
+            value={searchQuery}
+            onChange={e => setSearchQuery(e.target.value)}
+            placeholder="Search chapters..."
+            className="pl-8 pr-8 h-8 text-sm font-sans-ui"
+          />
+          {searchQuery && (
+            <Button
+              variant="ghost"
+              size="icon"
+              className="absolute right-1 top-1 h-6 w-6"
+              onClick={clearSearch}
+            >
+              <X className="w-3 h-3" />
+            </Button>
+          )}
+        </div>
+        {searchQuery && (
+          <p className="text-xs text-muted-foreground font-sans-ui">
+            {resultCount} result{resultCount !== 1 ? 's' : ''}
+          </p>
+        )}
       </div>
       <ScrollArea className="flex-1 scrollbar-thin">
         <div className="p-2">
-          {chapters.map((chapter) => (
+          {filteredChapters.map((chapter) => (
             <button
               key={chapter.id}
               onClick={() => onSelectChapter(chapter)}
@@ -32,7 +62,14 @@ const ChapterList = ({ chapters, activeChapterId, onSelectChapter }: ChapterList
                 {chapter.content && (
                   <BookmarkCheck className="w-3.5 h-3.5 text-primary flex-shrink-0" />
                 )}
-                <span className="truncate">{chapter.title}</span>
+                {searchQuery ? (
+                  <span
+                    className="truncate"
+                    dangerouslySetInnerHTML={{ __html: highlightMatch(chapter.title) }}
+                  />
+                ) : (
+                  <span className="truncate">{chapter.title}</span>
+                )}
               </div>
             </button>
           ))}

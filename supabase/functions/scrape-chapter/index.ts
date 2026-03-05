@@ -1,3 +1,5 @@
+import { chapterContentCache, Cache } from '../shared/cache.ts';
+
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version',
@@ -31,6 +33,17 @@ Deno.serve(async (req) => {
       formattedUrl = `https://${formattedUrl}`;
     }
 
+    // Check cache first
+    const cacheKey = Cache.keyFromUrl(formattedUrl);
+    const cached = chapterContentCache.get(cacheKey);
+    if (cached) {
+      console.log('Cache hit for chapter:', formattedUrl);
+      return new Response(
+        JSON.stringify({ success: true, data: { content: cached } }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
     console.log('Scraping chapter:', formattedUrl);
 
     const response = await fetch('https://api.firecrawl.dev/v1/scrape', {
@@ -59,7 +72,7 @@ Deno.serve(async (req) => {
     const markdown = data.data?.markdown || data.markdown || '';
 
     // Clean up the markdown - remove navigation elements and ads
-    let content = markdown
+    const content = markdown
       // Remove cookie/ad banners
       .replace(/Your experience on this site.*$/s, '')
       // Remove navigation links like "Previous Chapter" / "Next Chapter"
@@ -67,6 +80,9 @@ Deno.serve(async (req) => {
       // Clean up excessive newlines
       .replace(/\n{4,}/g, '\n\n\n')
       .trim();
+
+    // Store in cache
+    chapterContentCache.set(cacheKey, content);
 
     console.log(`Scraped chapter content: ${content.length} chars`);
 
