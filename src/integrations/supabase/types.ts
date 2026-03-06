@@ -14,7 +14,168 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      bookmarks: {
+        Row: {
+          chapter_local_id: string
+          chapter_title: string
+          created_at: string
+          id: string
+          label: string | null
+          novel_id: string
+          scroll_position: number
+          user_id: string
+        }
+        Insert: {
+          chapter_local_id: string
+          chapter_title: string
+          created_at?: string
+          id?: string
+          label?: string | null
+          novel_id: string
+          scroll_position?: number
+          user_id: string
+        }
+        Update: {
+          chapter_local_id?: string
+          chapter_title?: string
+          created_at?: string
+          id?: string
+          label?: string | null
+          novel_id?: string
+          scroll_position?: number
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "bookmarks_novel_id_fkey"
+            columns: ["novel_id"]
+            isOneToOne: false
+            referencedRelation: "novels"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      chapters: {
+        Row: {
+          content: string | null
+          created_at: string
+          id: string
+          local_id: string
+          novel_id: string
+          saved_at: string | null
+          title: string
+          url: string
+          user_id: string
+        }
+        Insert: {
+          content?: string | null
+          created_at?: string
+          id?: string
+          local_id: string
+          novel_id: string
+          saved_at?: string | null
+          title: string
+          url: string
+          user_id: string
+        }
+        Update: {
+          content?: string | null
+          created_at?: string
+          id?: string
+          local_id?: string
+          novel_id?: string
+          saved_at?: string | null
+          title?: string
+          url?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "chapters_novel_id_fkey"
+            columns: ["novel_id"]
+            isOneToOne: false
+            referencedRelation: "novels"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      novels: {
+        Row: {
+          cover_url: string | null
+          created_at: string
+          description: string | null
+          id: string
+          local_id: string
+          saved_at: string
+          title: string
+          updated_at: string
+          url: string
+          user_id: string
+        }
+        Insert: {
+          cover_url?: string | null
+          created_at?: string
+          description?: string | null
+          id?: string
+          local_id: string
+          saved_at?: string
+          title: string
+          updated_at?: string
+          url: string
+          user_id: string
+        }
+        Update: {
+          cover_url?: string | null
+          created_at?: string
+          description?: string | null
+          id?: string
+          local_id?: string
+          saved_at?: string
+          title?: string
+          updated_at?: string
+          url?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      reading_progress: {
+        Row: {
+          chapter_local_id: string
+          id: string
+          is_last_read: boolean
+          novel_id: string
+          scroll_position: number
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          chapter_local_id: string
+          id?: string
+          is_last_read?: boolean
+          novel_id: string
+          scroll_position?: number
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          chapter_local_id?: string
+          id?: string
+          is_last_read?: boolean
+          novel_id?: string
+          scroll_position?: number
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "reading_progress_novel_id_fkey"
+            columns: ["novel_id"]
+            isOneToOne: false
+            referencedRelation: "novels"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
