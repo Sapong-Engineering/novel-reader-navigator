@@ -7,6 +7,7 @@ import NovelToolbar from '@/components/NovelToolbar';
 import MobileChapterDrawer from '@/components/MobileChapterDrawer';
 import ErrorBoundary from '@/components/ErrorBoundary';
 import { type Novel, type Chapter, saveNovel, getNovel } from '@/lib/novel-store';
+import { syncNovel, syncBookmarksToBackend, syncProgressToBackend } from '@/lib/sync-service';
 import { exportToPdfWithProgress, exportToDocxWithProgress } from '@/lib/export-service';
 import { useChapterNavigation } from '@/hooks/useChapterNavigation';
 import { useChapterFetcher } from '@/hooks/useChapterFetcher';
@@ -21,7 +22,6 @@ const Reader = () => {
   const [novel, setNovel] = useState<Novel | null>(null);
   const [activeChapter, setActiveChapter] = useState<Chapter | null>(null);
   const [isLoadingChapter, setIsLoadingChapter] = useState(false);
-  // Pending scroll restore after a jump-to-bookmark navigation
   const pendingScrollRef = useRef<number | null>(null);
 
   const { isFetching: isFetchingAll, progress: fetchProgress, fetchAll } = useChapterFetcher();
@@ -65,6 +65,8 @@ const Reader = () => {
   async function handleSelectChapter(chapter: Chapter) {
     if (chapter.content) {
       setActiveChapter(chapter);
+      // Sync last-read to backend
+      syncProgressToBackend(novelIdStr, chapter.id, 0, true);
       return;
     }
     setIsLoadingChapter(true);
@@ -85,8 +87,10 @@ const Reader = () => {
         if (!prev) return prev;
         const newNovel = { ...prev, chapters: prev.chapters.map(c => c.id === chapter.id ? updated : c) };
         saveNovel(newNovel);
+        syncNovel(newNovel); // sync fetched chapter to backend
         return newNovel;
       });
+      syncProgressToBackend(novelIdStr, chapter.id, 0, true);
     } catch (err) {
       console.error('Failed to fetch chapter:', err);
       toast.error(
@@ -110,7 +114,6 @@ const Reader = () => {
     [novel], // eslint-disable-line react-hooks/exhaustive-deps
   );
 
-  // Custom restoreProgress that also handles pending bookmark scroll
   const handleChapterReady = useCallback(
     async (container: HTMLElement) => {
       const pending = pendingScrollRef.current;
@@ -124,30 +127,49 @@ const Reader = () => {
     [restoreProgress],
   );
 
+  const handleSaveProgress = useCallback(
+    (scrollTop: number) => {
+      saveProgress(scrollTop);
+      if (activeChapter) {
+        syncProgressToBackend(novelIdStr, activeChapter.id, scrollTop, false);
+      }
+    },
+    [saveProgress, novelIdStr, activeChapter],
+  );
+
   const handleAddBookmark = useCallback(
     (scrollPosition: number, label?: string) => {
       if (!activeChapter) return;
       addChapterBookmark(activeChapter, scrollPosition, label);
+      syncBookmarksToBackend(novelIdStr); // sync after add
       toast.success(label ? `Bookmarked: "${label}"` : 'Bookmark added');
     },
-    [activeChapter, addChapterBookmark],
+    [activeChapter, addChapterBookmark, novelIdStr],
   );
 
   const handleRemoveBookmark = useCallback(
     (id: string) => {
       removeBookmark(id);
+      syncBookmarksToBackend(novelIdStr); // sync after remove
       toast.success('Bookmark removed');
     },
-    [removeBookmark],
+    [removeBookmark, novelIdStr],
   );
 
   const handleFetchAll = useCallback(async () => {
     if (!novel || isFetchingAll) return;
-    await fetchAll(novel, setNovel);
+    await fetchAll(novel, (updatedNovel) => {
+      setNovel(updatedNovel);
+      syncNovel(updatedNovel); // sync after batch
+    });
   }, [novel, isFetchingAll, fetchAll]);
 
   const handleSave = useCallback(() => {
-    if (novel) { saveNovel(novel); toast.success('Novel saved!'); }
+    if (novel) {
+      saveNovel(novel);
+      syncNovel(novel);
+      toast.success('Novel saved!');
+    }
   }, [novel]);
 
   const handleExportPdf = useCallback(async () => {
@@ -231,7 +253,7 @@ const Reader = () => {
               onNextChapter={goToNext}
               hasPrev={hasPrev}
               hasNext={hasNext}
-              onScroll={saveProgress}
+              onScroll={handleSaveProgress}
               onChapterReady={handleChapterReady}
               chapterBookmarks={chapterBookmarks}
               onAddBookmark={handleAddBookmark}

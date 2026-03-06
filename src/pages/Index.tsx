@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import NovelUrlInput from '@/components/NovelUrlInput';
@@ -11,12 +11,28 @@ import {
   deleteNovel,
   generateId,
 } from '@/lib/novel-store';
-import { BookOpen } from 'lucide-react';
+import { syncLibraryFromBackend, syncNovel, syncDeleteNovel } from '@/lib/sync-service';
+import { useAuth } from '@/hooks/useAuth';
+import { BookOpen, LogOut, LogIn, Loader2 } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 
 const Index = () => {
   const navigate = useNavigate();
+  const { user, loading: authLoading, signOut } = useAuth();
   const [isLoadingNovel, setIsLoadingNovel] = useState(false);
   const [library, setLibrary] = useState<Novel[]>(() => getLibrary());
+  const [isSyncing, setIsSyncing] = useState(false);
+
+  // Sync library from backend when authenticated
+  useEffect(() => {
+    if (user && !authLoading) {
+      setIsSyncing(true);
+      syncLibraryFromBackend()
+        .then(novels => setLibrary(novels))
+        .catch(() => setLibrary(getLibrary()))
+        .finally(() => setIsSyncing(false));
+    }
+  }, [user, authLoading]);
 
   const handleFetchNovel = useCallback(async (url: string) => {
     setIsLoadingNovel(true);
@@ -36,6 +52,7 @@ const Index = () => {
         savedAt: new Date().toISOString(),
       };
       saveNovel(newNovel);
+      syncNovel(newNovel); // fire-and-forget backend sync
       setLibrary(getLibrary());
       navigate(`/reader/${newNovel.id}`);
       toast.success(`Loaded "${info.title}" with ${info.chapters.length} chapters!`);
@@ -53,12 +70,34 @@ const Index = () => {
 
   const handleDeleteNovel = useCallback((id: string) => {
     deleteNovel(id);
+    syncDeleteNovel(id); // fire-and-forget
     setLibrary(getLibrary());
     toast.success('Novel removed from library');
   }, []);
 
+  const handleSignOut = useCallback(async () => {
+    await signOut();
+    toast.success('Signed out');
+  }, [signOut]);
+
   return (
     <div className="min-h-screen bg-background">
+      {/* Top bar */}
+      <div className="flex items-center justify-end px-4 py-3 gap-2">
+        {authLoading ? null : user ? (
+          <>
+            <span className="text-xs text-muted-foreground truncate max-w-[200px]">{user.email}</span>
+            <Button variant="ghost" size="sm" onClick={handleSignOut}>
+              <LogOut className="w-4 h-4 mr-1" /> Sign Out
+            </Button>
+          </>
+        ) : (
+          <Button variant="ghost" size="sm" onClick={() => navigate('/auth')}>
+            <LogIn className="w-4 h-4 mr-1" /> Sign In
+          </Button>
+        )}
+      </div>
+
       {/* Hero Section */}
       <div className="flex items-center justify-center px-4 py-12 sm:py-20">
         <NovelUrlInput onSubmit={handleFetchNovel} isLoading={isLoadingNovel} />
@@ -74,6 +113,7 @@ const Index = () => {
               ({library.length} {library.length === 1 ? 'novel' : 'novels'})
             </span>
           )}
+          {isSyncing && <Loader2 className="w-4 h-4 animate-spin text-muted-foreground ml-2" />}
         </div>
 
         {library.length === 0 ? (
