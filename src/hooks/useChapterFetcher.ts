@@ -25,7 +25,7 @@ const rateLimiter = new RateLimiter({ requestsPerSecond: 2, maxConcurrent: 3 });
 export function useChapterFetcher(): UseChapterFetcherResult {
   const [isFetching, setIsFetching] = useState(false);
   const [progress, setProgress] = useState<FetchProgress>({ current: 0, total: 0 });
-  const batchFetcherRef = useRef(new BatchFetcher({ batchSize: 3 }));
+  const batchFetcherRef = useRef(new BatchFetcher<Chapter>({ batchSize: 3 }));
 
   const cancel = useCallback(() => {
     batchFetcherRef.current.cancel();
@@ -65,7 +65,7 @@ export function useChapterFetcher(): UseChapterFetcherResult {
 
       await batchFetcherRef.current.process(
         unfetched,
-        async (chapter, _idx) => {
+        async (chapter: Chapter, _idx: number) => {
           setProgress(prev => ({ ...prev, currentTitle: chapter.title }));
 
           const content = await rateLimiter.execute(() =>
