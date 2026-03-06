@@ -65,7 +65,7 @@ export function useChapterFetcher(): UseChapterFetcherResult {
 
       await batchFetcherRef.current.process(
         unfetched,
-        async (chapter, _idx) => {
+        async (chapter: Chapter, _idx: number) => {
           setProgress(prev => ({ ...prev, currentTitle: chapter.title }));
 
           const content = await rateLimiter.execute(() =>

@@ -88,7 +88,6 @@ Deno.serve(async (req) => {
     console.log(`Found ${novelInfo.chapters.length} chapters for "${novelInfo.title}"`);
 
     // Store in cache for future requests
-    const cacheKey = Cache.keyFromUrl(formattedUrl);
     novelInfoCache.set(cacheKey, novelInfo);
 
     return new Response(
