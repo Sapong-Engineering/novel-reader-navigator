@@ -32,7 +32,7 @@ The implementation is organized into seven major phases, each building on the pr
   - Verify regex pattern is valid and matches chapter URLs correctly
   - _Requirements: 1.2, 1.3, 1.4_
 
-- [~] 2. Implement React Error Boundary component
+- [ ] 2. Implement React Error Boundary component
   - Create `src/components/ErrorBoundary.tsx` with `ErrorBoundaryProps` and `ErrorBoundaryState` interfaces
   - Implement `componentDidCatch` lifecycle method to catch errors
   - Implement `getDerivedStateFromError` to update state on error
@@ -47,21 +47,21 @@ The implementation is organized into seven major phases, each building on the pr
   - Verify error doesn't propagate to parent components
   - _Requirements: 2.2, 2.6_
 
-- [~] 3. Wrap critical components with error boundaries
+- [ ] 3. Wrap critical components with error boundaries
   - Wrap `ReaderView` component with error boundary in reader page
   - Wrap `ChapterList` component with error boundary
   - Add top-level error boundary in `App.tsx`
   - Test error recovery by triggering errors in wrapped components
   - _Requirements: 2.4, 2.5, 2.6_
 
-- [~] 4. Checkpoint - Verify bug fixes
+- [ ] 4. Checkpoint - Verify bug fixes
   - Test regex with special character URLs
   - Trigger component errors to verify error boundaries work
   - Ensure all tests pass, ask the user if questions arise
 
 ### Phase 2: Core Infrastructure
 
-- [~] 5. Implement URL validation service
+- [ ] 5. Implement URL validation service
   - Create `src/lib/validation.ts` with `ValidationResult` and `URLValidationRules` interfaces
   - Implement `validateUrl` function with protocol validation (HTTP/HTTPS only)
   - Add domain validation using URL constructor
@@ -85,7 +85,7 @@ The implementation is organized into seven major phases, each building on the pr
   - Verify sanitization produces normalized canonical form
   - _Requirements: 5.4_
 
-- [~] 6. Implement content sanitization service
+- [ ] 6. Implement content sanitization service
   - Create `supabase/functions/shared/sanitization.ts`
   - Implement `sanitizeHtml` function to remove script tags
   - Remove event handler attributes (onclick, onerror, onload, etc.)
@@ -109,7 +109,7 @@ The implementation is organized into seven major phases, each building on the pr
   - Verify no scripts execute when rendered
   - _Requirements: 6.4_
 
-- [~] 7. Implement rate limiter utility
+- [ ] 7. Implement rate limiter utility
   - Create `src/lib/utils/rate-limiter.ts` with `RateLimiterConfig` interface
   - Implement `RateLimiter` class using token bucket algorithm
   - Add configurable requests per second (default: 2)
@@ -125,7 +125,7 @@ The implementation is organized into seven major phases, each building on the pr
   - Verify time between consecutive requests meets minimum delay
   - _Requirements: 3.2, 3.4_
 
-- [~] 8. Implement retry handler utility
+- [ ] 8. Implement retry handler utility
   - Create `src/lib/utils/retry-handler.ts` with `RetryConfig` interface
   - Implement `withRetry` function with exponential backoff
   - Calculate delay as `min(baseDelay * 2^attempt, maxDelay)`
@@ -156,7 +156,7 @@ The implementation is organized into seven major phases, each building on the pr
   - Test no retry for 4xx errors (except 429)
   - _Requirements: 4.4, 4.5_
 
-- [~] 9. Checkpoint - Verify core infrastructure
+- [ ] 9. Checkpoint - Verify core infrastructure
   - Test URL validation with various invalid inputs
   - Test content sanitization with XSS attempts
   - Test rate limiter with burst requests
@@ -165,7 +165,7 @@ The implementation is organized into seven major phases, each building on the pr
 
 ### Phase 3: Architecture Improvements
 
-- [~] 10. Implement site adapter pattern
+- [ ] 10. Implement site adapter pattern
   - Create `supabase/functions/scrape-novel/adapters/` directory
   - Define `SiteAdapter` interface with extraction methods
   - Create `AdapterRegistry` class for adapter management
@@ -181,14 +181,14 @@ The implementation is organized into seven major phases, each building on the pr
   - Verify correct adapter selected or fallback to default
   - _Requirements: 7.4, 7.6_
 
-- [~] 11. Integrate site adapters into scraper service
+- [ ] 11. Integrate site adapters into scraper service
   - Update `supabase/functions/scrape-novel/index.ts` to use adapter registry
   - Add adapter selection logic based on URL
   - Update novel extraction to use adapter methods
   - Test with multiple novel site URLs
   - _Requirements: 7.4, 7.6_
 
-- [~] 12. Implement cache layer
+- [ ] 12. Implement cache layer
   - Create `supabase/functions/shared/cache.ts` with `CacheEntry` and `CacheConfig` interfaces
   - Implement `Cache` class with LRU eviction policy
   - Add TTL support (default: 24 hours)
@@ -215,14 +215,14 @@ The implementation is organized into seven major phases, each building on the pr
   - Test that least recently used entry is evicted when cache full
   - _Requirements: 8.7_
 
-- [~] 13. Integrate cache into scraper service
+- [ ] 13. Integrate cache into scraper service
   - Update `supabase/functions/scrape-novel/index.ts` to check cache before API calls
   - Update `supabase/functions/scrape-chapter/index.ts` to use cache
   - Add cache key generation for novel and chapter requests
   - Implement cache update after successful API calls
   - _Requirements: 8.2, 8.3, 8.4_
 
-- [~] 14. Implement batch fetcher utility
+- [ ] 14. Implement batch fetcher utility
   - Create `src/lib/utils/batch-fetcher.ts` with `BatchConfig` and `BatchResult` interfaces
   - Implement `BatchFetcher` class with configurable batch size (default: 3)
   - Process batches sequentially, items within batch in parallel
@@ -250,7 +250,7 @@ The implementation is organized into seven major phases, each building on the pr
   - Test that item failures don't stop other items in batch
   - _Requirements: 9.5_
 
-- [~] 15. Implement storage manager with quota monitoring
+- [ ] 15. Implement storage manager with quota monitoring
   - Create `src/lib/storage-manager.ts` with `StorageQuota` and `StorageManager` interfaces
   - Implement `getQuota` method to calculate storage usage
   - Add 80% usage threshold warning
@@ -265,7 +265,7 @@ The implementation is organized into seven major phases, each building on the pr
   - Test that save exceeding quota displays error with space info
   - _Requirements: 10.3_
 
-- [~] 16. Checkpoint - Verify architecture improvements
+- [ ] 16. Checkpoint - Verify architecture improvements
   - Test site adapter selection with multiple URLs
   - Test cache hit/miss scenarios
   - Test batch fetcher with various batch sizes
@@ -274,7 +274,7 @@ The implementation is organized into seven major phases, each building on the pr
 
 ### Phase 4: UI/UX Enhancements
 
-- [~] 17. Implement theme provider and toggle
+- [ ] 17. Implement theme provider and toggle
   - Create `src/contexts/ThemeContext.tsx` with `ThemeContextValue` interface
   - Use next-themes library for theme management
   - Implement system preference detection via media query
@@ -295,7 +295,7 @@ The implementation is organized into seven major phases, each building on the pr
   - Test that theme preference persists after reload
   - _Requirements: 13.3, 13.4_
 
-- [~] 18. Implement reader customization context
+- [ ] 18. Implement reader customization context
   - Create `src/contexts/ReaderContext.tsx` with `ReaderSettings` and `ReaderContextValue` interfaces
   - Implement font size control (12-24px range)
   - Implement font family selection (serif, sans-serif, monospace)
@@ -317,7 +317,7 @@ The implementation is organized into seven major phases, each building on the pr
   - Test that reset button restores default values
   - _Requirements: 14.6_
 
-- [~] 19. Implement chapter search and filter
+- [ ] 19. Implement chapter search and filter
   - Create `src/hooks/useChapterSearch.ts` with `UseChapterSearchResult` interface
   - Implement text-based chapter filtering (case-insensitive)
   - Implement numeric chapter filtering
@@ -339,7 +339,7 @@ The implementation is organized into seven major phases, each building on the pr
   - Test that clearing search restores full chapter list
   - _Requirements: 11.6_
 
-- [~] 20. Implement reading progress tracking
+- [ ] 20. Implement reading progress tracking
   - Create `src/hooks/useReadingProgress.ts` with `UseReadingProgressResult` interface
   - Implement scroll position tracking and saving
   - Implement scroll position restoration on chapter load
@@ -360,7 +360,7 @@ The implementation is organized into seven major phases, each building on the pr
   - Test that last read chapter is auto-selected on novel open
   - _Requirements: 12.5_
 
-- [~] 21. Implement export progress indicators
+- [ ] 21. Implement export progress indicators
   - Update `src/lib/export-service.ts` to emit progress events
   - Create progress modal component
   - Display current chapter being processed and total count
@@ -375,7 +375,7 @@ The implementation is organized into seven major phases, each building on the pr
   - Test that progress accurately reflects current chapter and percentage
   - _Requirements: 15.2, 15.3, 15.4_
 
-- [~] 22. Implement fetch all progress indicator
+- [ ] 22. Implement fetch all progress indicator
   - Create `src/hooks/useChapterFetcher.ts` with `UseChapterFetcherResult` interface
   - Integrate batch fetcher with rate limiter and retry handler
   - Display progress bar with chapter count and percentage
@@ -396,7 +396,7 @@ The implementation is organized into seven major phases, each building on the pr
   - Test that cancelled fetch saves all completed chapters
   - _Requirements: 16.5, 16.6_
 
-- [~] 23. Checkpoint - Verify UI/UX enhancements
+- [ ] 23. Checkpoint - Verify UI/UX enhancements
   - Test theme toggle and persistence
   - Test font customization and persistence
   - Test chapter search with various queries
@@ -407,7 +407,7 @@ The implementation is organized into seven major phases, each building on the pr
 
 ### Phase 5: Component Refactoring
 
-- [~] 24. Extract chapter navigation hook
+- [ ] 24. Extract chapter navigation hook
   - Create `src/hooks/useChapterNavigation.ts` with `UseChapterNavigationResult` interface
   - Extract chapter selection logic from Reader component
   - Implement next/previous chapter navigation
@@ -415,7 +415,7 @@ The implementation is organized into seven major phases, each building on the pr
   - Add hasNext/hasPrev boolean flags
   - _Requirements: 17.2_
 
-- [~] 25. Refactor Reader component into smaller components
+- [ ] 25. Refactor Reader component into smaller components
   - Create `src/components/reader/ReaderPage.tsx` as orchestrator
   - Create `src/components/reader/ReaderToolbar.tsx` for toolbar actions
   - Create `src/components/reader/ReaderContent.tsx` for chapter display
@@ -424,75 +424,75 @@ The implementation is organized into seven major phases, each building on the pr
   - Define clear prop interfaces for all components
   - _Requirements: 17.1, 17.4, 17.5_
 
-- [~] 26. Extract fetch operations into custom hook
+- [ ] 26. Extract fetch operations into custom hook
   - Move fetch logic from components to `useChapterFetcher` hook
   - Integrate rate limiter, retry handler, and batch fetcher
   - Add validation and sanitization to fetch pipeline
   - Update components to use new hook
   - _Requirements: 17.3_
 
-- [~] 27. Verify refactored components maintain functionality
+- [ ] 27. Verify refactored components maintain functionality
   - Test all reader functionality after refactoring
   - Verify no regressions in chapter navigation
   - Verify fetch operations work correctly
   - Ensure UI updates properly
   - _Requirements: 17.6_
 
-- [~] 28. Checkpoint - Verify component refactoring
+- [ ] 28. Checkpoint - Verify component refactoring
   - Test all reader features end-to-end
   - Verify component isolation and reusability
   - Ensure all tests pass, ask the user if questions arise
 
 ### Phase 6: TypeScript Strict Mode
 
-- [~] 29. Enable TypeScript strict mode
+- [ ] 29. Enable TypeScript strict mode
   - Update `tsconfig.json` to set `"strict": true`
   - Run `tsc --noEmit` to identify all type errors
   - Create list of files with type errors
   - _Requirements: 18.1_
 
-- [~] 30. Fix type errors in utility files
+- [ ] 30. Fix type errors in utility files
   - Add explicit return types to all functions in `src/lib/`
   - Replace `any` types with proper types
   - Add type guards for null/undefined handling
   - Fix errors in validation.ts, storage-manager.ts, rate-limiter.ts, retry-handler.ts
   - _Requirements: 18.2, 18.3, 18.4, 18.5, 18.6_
 
-- [~] 31. Fix type errors in components
+- [ ] 31. Fix type errors in components
   - Add explicit types to all component props
   - Add return types to component functions
   - Fix null/undefined handling in components
   - Update ErrorBoundary, ReaderPage, ReaderContent, ChapterList
   - _Requirements: 18.2, 18.3, 18.4, 18.5, 18.6_
 
-- [~] 32. Fix type errors in hooks
+- [ ] 32. Fix type errors in hooks
   - Add explicit return types to all custom hooks
   - Fix parameter types in hooks
   - Handle null/undefined cases explicitly
   - Update useChapterFetcher, useChapterNavigation, useReadingProgress, useChapterSearch
   - _Requirements: 18.2, 18.3, 18.4, 18.5, 18.6_
 
-- [~] 33. Fix type errors in Supabase functions
+- [ ] 33. Fix type errors in Supabase functions
   - Add types to scraper service functions
   - Add types to adapter interfaces and implementations
   - Add types to cache and sanitization utilities
   - Ensure no `any` types remain
   - _Requirements: 18.2, 18.3, 18.4, 18.5, 18.6_
 
-- [~] 34. Verify TypeScript strict mode compliance
+- [ ] 34. Verify TypeScript strict mode compliance
   - Run `tsc --noEmit` and verify no errors
   - Run all tests to ensure no runtime issues
   - Review code for any remaining type issues
   - _Requirements: 18.1, 18.2_
 
-- [~] 35. Checkpoint - Verify TypeScript strict mode
+- [ ] 35. Checkpoint - Verify TypeScript strict mode
   - Confirm zero TypeScript errors
   - Ensure all tests pass
   - Ask the user if questions arise
 
 ### Phase 7: Testing and Error Handling
 
-- [~] 36. Improve error messages throughout application
+- [ ] 36. Improve error messages throughout application
   - Update all error messages to be user-friendly (no technical jargon)
   - Add actionable suggestions to error messages
   - Implement network error detection with connection check suggestion
@@ -513,7 +513,7 @@ The implementation is organized into seven major phases, each building on the pr
   - Test that validation errors highlight field and show explanation
   - _Requirements: 19.4_
 
-- [~] 37. Write unit tests for storage manager
+- [ ] 37. Write unit tests for storage manager
   - Create `src/lib/storage-manager.test.ts`
   - Test save and retrieve novel operations
   - Test quota calculation accuracy
@@ -522,7 +522,7 @@ The implementation is organized into seven major phases, each building on the pr
   - Achieve 80% code coverage
   - _Requirements: 20.1_
 
-- [~] 38. Write unit tests for scraper service
+- [ ] 38. Write unit tests for scraper service
   - Create `supabase/functions/scrape-novel/index.test.ts`
   - Test adapter selection logic
   - Test cache integration
@@ -531,7 +531,7 @@ The implementation is organized into seven major phases, each building on the pr
   - Achieve 80% code coverage
   - _Requirements: 20.2_
 
-- [~] 39. Write unit tests for validation logic
+- [ ] 39. Write unit tests for validation logic
   - Create `src/lib/validation.test.ts`
   - Test all validation rules (protocol, length, domain, malicious patterns)
   - Test URL sanitization
@@ -539,7 +539,7 @@ The implementation is organized into seven major phases, each building on the pr
   - Achieve 100% code coverage
   - _Requirements: 20.3_
 
-- [~] 40. Write unit tests for sanitization logic
+- [ ] 40. Write unit tests for sanitization logic
   - Create `supabase/functions/shared/sanitization.test.ts`
   - Test script tag removal
   - Test event handler removal
@@ -548,7 +548,7 @@ The implementation is organized into seven major phases, each building on the pr
   - Achieve 100% code coverage
   - _Requirements: 20.4_
 
-- [~] 41. Write unit tests for rate limiter
+- [ ] 41. Write unit tests for rate limiter
   - Create `src/lib/utils/rate-limiter.test.ts`
   - Test minimum delay enforcement
   - Test concurrent request limit
@@ -556,7 +556,7 @@ The implementation is organized into seven major phases, each building on the pr
   - Achieve 80% code coverage
   - _Requirements: 20.1_
 
-- [~] 42. Write unit tests for retry handler
+- [ ] 42. Write unit tests for retry handler
   - Create `src/lib/utils/retry-handler.test.ts`
   - Test exponential backoff timing
   - Test retry decision logic for different status codes
@@ -565,7 +565,7 @@ The implementation is organized into seven major phases, each building on the pr
   - Achieve 80% code coverage
   - _Requirements: 20.1_
 
-- [~] 43. Write integration test for chapter fetching workflow
+- [ ] 43. Write integration test for chapter fetching workflow
   - Create `src/__tests__/integration/chapter-fetching.test.ts`
   - Test end-to-end chapter fetch with rate limiting and retry
   - Test batch fetching with progress updates
@@ -573,7 +573,7 @@ The implementation is organized into seven major phases, each building on the pr
   - Test cancellation preserves fetched chapters
   - _Requirements: 20.5_
 
-- [~] 44. Write integration test for export workflow
+- [ ] 44. Write integration test for export workflow
   - Create `src/__tests__/integration/export.test.ts`
   - Test PDF export with progress tracking
   - Test DOCX export with progress tracking
@@ -581,7 +581,7 @@ The implementation is organized into seven major phases, each building on the pr
   - Test large novel export
   - _Requirements: 20.6_
 
-- [~] 45. Configure continuous integration
+- [ ] 45. Configure continuous integration
   - Create `.github/workflows/test.yml`
   - Add linting step
   - Add type checking step
@@ -591,7 +591,7 @@ The implementation is organized into seven major phases, each building on the pr
   - Configure to run on every commit
   - _Requirements: 20.7_
 
-- [~] 46. Final checkpoint - Comprehensive testing
+- [ ] 46. Final checkpoint - Comprehensive testing
   - Run full test suite and verify all tests pass
   - Check code coverage meets targets (80% overall, 100% for validation/sanitization)
   - Manually test critical user workflows
