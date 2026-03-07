@@ -23,12 +23,19 @@ const Reader = () => {
   const [activeChapter, setActiveChapter] = useState<Chapter | null>(null);
   const [isLoadingChapter, setIsLoadingChapter] = useState(false);
   const pendingScrollRef = useRef<number | null>(null);
+  const forceScrollTopRef = useRef(false);
 
   const { isFetching: isFetchingAll, progress: fetchProgress, fetchAll } = useChapterFetcher();
+
+  const handleNavSelectChapter = useCallback((chapter: Chapter) => {
+    forceScrollTopRef.current = true;
+    handleSelectChapter(chapter);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
   const { hasPrev, hasNext, goToPrev, goToNext } = useChapterNavigation(
     novel?.chapters ?? [],
     activeChapter,
-    handleSelectChapter,
+    handleNavSelectChapter,
   );
 
   const novelIdStr = novelId ?? '';
