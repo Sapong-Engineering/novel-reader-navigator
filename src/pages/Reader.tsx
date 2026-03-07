@@ -123,6 +123,11 @@ const Reader = () => {
 
   const handleChapterReady = useCallback(
     async (container: HTMLElement) => {
+      if (forceScrollTopRef.current) {
+        forceScrollTopRef.current = false;
+        container.scrollTop = 0;
+        return;
+      }
       const pending = pendingScrollRef.current;
       if (pending !== null) {
         pendingScrollRef.current = null;

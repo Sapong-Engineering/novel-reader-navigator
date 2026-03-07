@@ -35,9 +35,26 @@ const Index = () => {
   }, [user, authLoading]);
 
   const handleFetchNovel = useCallback(async (url: string) => {
+    // Check if novel with same URL already exists
+    const existing = library.find(n => n.url === url);
+    if (existing) {
+      navigate(`/reader/${existing.id}`);
+      toast.info(`"${existing.title}" is already in your library.`);
+      return;
+    }
+
     setIsLoadingNovel(true);
     try {
       const info = await scrapeNovelInfo(url);
+
+      // Check again after fetch (by URL or title)
+      const existingAfterFetch = library.find(n => n.url === url);
+      if (existingAfterFetch) {
+        navigate(`/reader/${existingAfterFetch.id}`);
+        toast.info(`"${existingAfterFetch.title}" is already in your library.`);
+        return;
+      }
+
       const newNovel: Novel = {
         id: generateId(),
         title: info.title,
@@ -52,7 +69,7 @@ const Index = () => {
         savedAt: new Date().toISOString(),
       };
       saveNovel(newNovel);
-      syncNovel(newNovel); // fire-and-forget backend sync
+      syncNovel(newNovel);
       setLibrary(getLibrary());
       navigate(`/reader/${newNovel.id}`);
       toast.success(`Loaded "${info.title}" with ${info.chapters.length} chapters!`);
@@ -62,7 +79,7 @@ const Index = () => {
     } finally {
       setIsLoadingNovel(false);
     }
-  }, [navigate]);
+  }, [navigate, library]);
 
   const handleOpenNovel = useCallback((novel: Novel) => {
     navigate(`/reader/${novel.id}`);

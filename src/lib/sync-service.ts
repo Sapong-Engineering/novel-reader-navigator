@@ -73,14 +73,30 @@ export async function syncLibraryFromBackend(): Promise<Novel[]> {
       mergedNovels.push(novel);
     }
 
-    // Push local-only novels to backend in parallel
-    const localOnly = localLibrary.filter(n => !seenLocalIds.has(n.id));
+    // Push local-only novels to backend in parallel (skip URL duplicates)
+    const seenUrls = new Set(mergedNovels.map(n => n.url));
+    const localOnly = localLibrary.filter(n => !seenLocalIds.has(n.id) && !seenUrls.has(n.url));
     if (localOnly.length > 0) {
       await Promise.all(localOnly.map(novel => upsertNovelToBackend(novel, userId)));
       mergedNovels.push(...localOnly);
     }
 
-    return mergedNovels;
+    // Deduplicate by URL — keep the one with more fetched chapters
+    const urlMap = new Map<string, Novel>();
+    for (const novel of mergedNovels) {
+      const existing = urlMap.get(novel.url);
+      if (!existing) {
+        urlMap.set(novel.url, novel);
+      } else {
+        const existingFetched = existing.chapters.filter(c => c.content).length;
+        const currentFetched = novel.chapters.filter(c => c.content).length;
+        if (currentFetched > existingFetched) {
+          urlMap.set(novel.url, novel);
+        }
+      }
+    }
+
+    return Array.from(urlMap.values());
   } catch (err) {
     console.error('Sync failed, using local data:', err);
     return getLibrary();
