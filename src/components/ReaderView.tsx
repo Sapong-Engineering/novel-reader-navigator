@@ -34,6 +34,7 @@ const ReaderView = ({
 }: ReaderViewProps) => {
   const scrollRef = useRef<HTMLDivElement>(null);
   const [currentScrollTop, setCurrentScrollTop] = useState(0);
+  const [scrollProgress, setScrollProgress] = useState(0);
   const [showLabelInput, setShowLabelInput] = useState(false);
   const [labelDraft, setLabelDraft] = useState('');
 
@@ -42,11 +43,14 @@ const ReaderView = ({
     if (!el || !chapter) return;
 
     setCurrentScrollTop(0);
+    setScrollProgress(0);
     onChapterReady?.(el);
 
     const handleScroll = () => {
       const top = el.scrollTop;
+      const maxScroll = el.scrollHeight - el.clientHeight;
       setCurrentScrollTop(top);
+      setScrollProgress(maxScroll > 0 ? Math.min((top / maxScroll) * 100, 100) : 0);
       onScroll?.(top);
     };
     el.addEventListener('scroll', handleScroll, { passive: true });
@@ -114,6 +118,13 @@ const ReaderView = ({
 
   return (
     <div className="flex flex-col h-full bg-reader relative">
+      {/* Reading progress bar */}
+      <div className="h-1 w-full bg-muted shrink-0">
+        <div
+          className="h-full bg-primary transition-all duration-150 ease-out"
+          style={{ width: `${scrollProgress}%` }}
+        />
+      </div>
       <div
         ref={scrollRef}
         className="flex-1 overflow-y-auto scrollbar-thin"
