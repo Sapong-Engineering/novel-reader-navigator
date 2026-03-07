@@ -43,11 +43,14 @@ const ReaderView = ({
     if (!el || !chapter) return;
 
     setCurrentScrollTop(0);
+    setScrollProgress(0);
     onChapterReady?.(el);
 
     const handleScroll = () => {
       const top = el.scrollTop;
+      const maxScroll = el.scrollHeight - el.clientHeight;
       setCurrentScrollTop(top);
+      setScrollProgress(maxScroll > 0 ? Math.min((top / maxScroll) * 100, 100) : 0);
       onScroll?.(top);
     };
     el.addEventListener('scroll', handleScroll, { passive: true });
