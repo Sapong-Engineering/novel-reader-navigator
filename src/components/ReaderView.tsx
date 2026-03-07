@@ -1,7 +1,7 @@
-import { useRef, useEffect, useState } from 'react';
+import { useRef, useEffect, useState, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { ChevronLeft, ChevronRight, Loader2, Bookmark, BookmarkCheck } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Loader2, Bookmark, BookmarkCheck, ArrowUp, ArrowDown } from 'lucide-react';
 import type { Chapter } from '@/lib/novel-store';
 import type { Bookmark as BookmarkType } from '@/lib/bookmarks';
 
@@ -101,8 +101,19 @@ const ReaderView = ({
     );
   }
 
+  const showScrollTop = currentScrollTop > 300;
+
+  const handleScrollToTop = () => {
+    scrollRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const handleScrollToBottom = () => {
+    const el = scrollRef.current;
+    if (el) el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' });
+  };
+
   return (
-    <div className="flex flex-col h-full bg-reader">
+    <div className="flex flex-col h-full bg-reader relative">
       <div
         ref={scrollRef}
         className="flex-1 overflow-y-auto scrollbar-thin"
@@ -129,6 +140,32 @@ const ReaderView = ({
             </p>
           )}
         </div>
+      </div>
+
+      {/* Floating scroll buttons */}
+      <div className="absolute right-4 bottom-20 flex flex-col gap-2 z-10">
+        {showScrollTop && (
+          <Button
+            variant="secondary"
+            size="icon"
+            className="h-9 w-9 rounded-full shadow-md"
+            onClick={handleScrollToTop}
+            title="Back to top"
+          >
+            <ArrowUp className="w-4 h-4" />
+          </Button>
+        )}
+        {!showScrollTop && chapter.content && (
+          <Button
+            variant="secondary"
+            size="icon"
+            className="h-9 w-9 rounded-full shadow-md"
+            onClick={handleScrollToBottom}
+            title="Go to bottom"
+          >
+            <ArrowDown className="w-4 h-4" />
+          </Button>
+        )}
       </div>
 
       {/* Inline bookmark label input */}
