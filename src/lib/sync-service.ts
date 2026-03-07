@@ -266,9 +266,6 @@ export async function syncProgressToBackend(
         is_last_read: isLastRead,
         updated_at: new Date().toISOString(),
       }, { onConflict: 'user_id,novel_id,chapter_local_id' });
-    );
-
-    await Promise.all(promises);
   } catch (err) {
     console.error('Failed to sync progress:', err);
   }
