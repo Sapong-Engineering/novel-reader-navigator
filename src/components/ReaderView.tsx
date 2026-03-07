@@ -34,6 +34,7 @@ const ReaderView = ({
 }: ReaderViewProps) => {
   const scrollRef = useRef<HTMLDivElement>(null);
   const [currentScrollTop, setCurrentScrollTop] = useState(0);
+  const [scrollProgress, setScrollProgress] = useState(0);
   const [showLabelInput, setShowLabelInput] = useState(false);
   const [labelDraft, setLabelDraft] = useState('');
 
