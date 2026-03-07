@@ -118,6 +118,13 @@ const ReaderView = ({
 
   return (
     <div className="flex flex-col h-full bg-reader relative">
+      {/* Reading progress bar */}
+      <div className="h-1 w-full bg-muted shrink-0">
+        <div
+          className="h-full bg-primary transition-all duration-150 ease-out"
+          style={{ width: `${scrollProgress}%` }}
+        />
+      </div>
       <div
         ref={scrollRef}
         className="flex-1 overflow-y-auto scrollbar-thin"
