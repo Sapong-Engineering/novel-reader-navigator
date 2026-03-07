@@ -246,32 +246,26 @@ export async function syncProgressToBackend(
       .maybeSingle();
     if (!novelRow) return;
 
-    // Unset previous last-read and upsert new progress in parallel
-    const promises: Promise<unknown>[] = [];
-
+    // Unset previous last-read and upsert new progress
     if (isLastRead) {
-      promises.push(
-        supabase
-          .from('reading_progress')
-          .update({ is_last_read: false })
-          .eq('novel_id', novelRow.id)
-          .eq('user_id', userId)
-          .eq('is_last_read', true)
-          .then()
-      );
+      await supabase
+        .from('reading_progress')
+        .update({ is_last_read: false })
+        .eq('novel_id', novelRow.id)
+        .eq('user_id', userId)
+        .eq('is_last_read', true);
     }
 
-    promises.push(
-      supabase
-        .from('reading_progress')
-        .upsert({
-          user_id: userId,
-          novel_id: novelRow.id,
-          chapter_local_id: chapterLocalId,
-          scroll_position: scrollPosition,
-          is_last_read: isLastRead,
-          updated_at: new Date().toISOString(),
-        }, { onConflict: 'user_id,novel_id,chapter_local_id' })
+    await supabase
+      .from('reading_progress')
+      .upsert({
+        user_id: userId,
+        novel_id: novelRow.id,
+        chapter_local_id: chapterLocalId,
+        scroll_position: scrollPosition,
+        is_last_read: isLastRead,
+        updated_at: new Date().toISOString(),
+      }, { onConflict: 'user_id,novel_id,chapter_local_id' });
     );
 
     await Promise.all(promises);
