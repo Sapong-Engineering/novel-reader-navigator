@@ -257,6 +257,7 @@ export async function syncProgressToBackend(
           .eq('novel_id', novelRow.id)
           .eq('user_id', userId)
           .eq('is_last_read', true)
+          .then()
       );
     }
 
