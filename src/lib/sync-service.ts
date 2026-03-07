@@ -15,44 +15,51 @@ export async function syncLibraryFromBackend(): Promise<Novel[]> {
   if (!userId) return getLibrary();
 
   try {
-    const { data: remoteNovels, error } = await supabase
-      .from('novels')
-      .select('*');
+    // Fetch novels and chapters in parallel
+    const [novelsRes, chaptersRes] = await Promise.all([
+      supabase.from('novels').select('*'),
+      supabase.from('chapters').select('*'),
+    ]);
 
-    if (error) throw error;
-    if (!remoteNovels?.length) {
-      // Push local novels to backend
+    if (novelsRes.error) throw novelsRes.error;
+
+    const remoteNovels = novelsRes.data ?? [];
+    const remoteChapters = chaptersRes.data ?? [];
+
+    if (!remoteNovels.length) {
+      // Push all local novels to backend in parallel
       const local = getLibrary();
-      for (const novel of local) {
-        await upsertNovelToBackend(novel, userId);
+      if (local.length > 0) {
+        await Promise.all(local.map(novel => upsertNovelToBackend(novel, userId)));
       }
       return local;
     }
 
-    // Fetch chapters for each remote novel
-    const { data: remoteChapters } = await supabase
-      .from('chapters')
-      .select('*');
+    // Build chapter lookup by novel_id for O(1) access
+    const chaptersByNovelId = new Map<string, typeof remoteChapters>();
+    for (const c of remoteChapters) {
+      const arr = chaptersByNovelId.get(c.novel_id) ?? [];
+      arr.push(c);
+      chaptersByNovelId.set(c.novel_id, arr);
+    }
 
     const localLibrary = getLibrary();
+    const localMap = new Map(localLibrary.map(n => [n.id, n]));
     const mergedNovels: Novel[] = [];
     const seenLocalIds = new Set<string>();
 
     for (const rn of remoteNovels) {
       seenLocalIds.add(rn.local_id);
-      const chapters = (remoteChapters ?? [])
-        .filter(c => c.novel_id === rn.id)
-        .map(c => ({
-          id: c.local_id,
-          title: c.title,
-          url: c.url,
-          content: c.content ?? undefined,
-          savedAt: c.saved_at ?? undefined,
-        }));
+      const chapters = (chaptersByNovelId.get(rn.id) ?? []).map(c => ({
+        id: c.local_id,
+        title: c.title,
+        url: c.url,
+        content: c.content ?? undefined,
+        savedAt: c.saved_at ?? undefined,
+      }));
 
-      const localNovel = localLibrary.find(n => n.id === rn.local_id);
+      const localNovel = localMap.get(rn.local_id);
 
-      // Merge: backend wins for metadata, merge chapters (backend content wins)
       const novel: Novel = {
         id: rn.local_id,
         title: rn.title,
@@ -66,12 +73,11 @@ export async function syncLibraryFromBackend(): Promise<Novel[]> {
       mergedNovels.push(novel);
     }
 
-    // Push local-only novels to backend
-    for (const local of localLibrary) {
-      if (!seenLocalIds.has(local.id)) {
-        await upsertNovelToBackend(local, userId);
-        mergedNovels.push(local);
-      }
+    // Push local-only novels to backend in parallel
+    const localOnly = localLibrary.filter(n => !seenLocalIds.has(n.id));
+    if (localOnly.length > 0) {
+      await Promise.all(localOnly.map(novel => upsertNovelToBackend(novel, userId)));
+      mergedNovels.push(...localOnly);
     }
 
     return mergedNovels;
@@ -86,7 +92,6 @@ function mergeChapters(local: Chapter[], remote: Chapter[]): Chapter[] {
   for (const ch of local) map.set(ch.id, ch);
   for (const ch of remote) {
     const existing = map.get(ch.id);
-    // Remote content wins if it exists
     if (!existing || ch.content) {
       map.set(ch.id, ch);
     }
@@ -125,8 +130,8 @@ async function getOrCreateNovelId(localId: string, userId: string, novel: Novel)
 async function upsertNovelToBackend(novel: Novel, userId: string): Promise<void> {
   const novelUuid = await getOrCreateNovelId(novel.id, userId, novel);
 
-  // Update novel metadata
-  await supabase
+  // Update metadata
+  const metaPromise = supabase
     .from('novels')
     .update({
       title: novel.title,
@@ -138,21 +143,24 @@ async function upsertNovelToBackend(novel: Novel, userId: string): Promise<void>
     })
     .eq('id', novelUuid);
 
-  // Upsert chapters with content
+  // Batch upsert all chapters with content in one call
   const chaptersWithContent = novel.chapters.filter(c => c.content);
-  for (const ch of chaptersWithContent) {
-    await supabase
-      .from('chapters')
-      .upsert({
-        novel_id: novelUuid,
-        user_id: userId,
-        local_id: ch.id,
-        title: ch.title,
-        url: ch.url,
-        content: ch.content ?? null,
-        saved_at: ch.savedAt ?? null,
-      }, { onConflict: 'novel_id,local_id' });
-  }
+  const chaptersPromise = chaptersWithContent.length > 0
+    ? supabase.from('chapters').upsert(
+        chaptersWithContent.map(ch => ({
+          novel_id: novelUuid,
+          user_id: userId,
+          local_id: ch.id,
+          title: ch.title,
+          url: ch.url,
+          content: ch.content ?? null,
+          saved_at: ch.savedAt ?? null,
+        })),
+        { onConflict: 'novel_id,local_id' }
+      )
+    : Promise.resolve(null);
+
+  await Promise.all([metaPromise, chaptersPromise]);
 }
 
 export async function syncNovel(novel: Novel): Promise<void> {
@@ -195,7 +203,7 @@ export async function syncBookmarksToBackend(novelLocalId: string): Promise<void
 
     const localBookmarks = getBookmarks(novelLocalId);
 
-    // Delete existing backend bookmarks for this novel, then re-insert
+    // Delete existing + re-insert in parallel where possible
     await supabase
       .from('bookmarks')
       .delete()
@@ -238,26 +246,34 @@ export async function syncProgressToBackend(
       .maybeSingle();
     if (!novelRow) return;
 
-    // If marking as last read, unset previous last-read
+    // Unset previous last-read and upsert new progress in parallel
+    const promises: Promise<unknown>[] = [];
+
     if (isLastRead) {
-      await supabase
-        .from('reading_progress')
-        .update({ is_last_read: false })
-        .eq('novel_id', novelRow.id)
-        .eq('user_id', userId)
-        .eq('is_last_read', true);
+      promises.push(
+        supabase
+          .from('reading_progress')
+          .update({ is_last_read: false })
+          .eq('novel_id', novelRow.id)
+          .eq('user_id', userId)
+          .eq('is_last_read', true)
+      );
     }
 
-    await supabase
-      .from('reading_progress')
-      .upsert({
-        user_id: userId,
-        novel_id: novelRow.id,
-        chapter_local_id: chapterLocalId,
-        scroll_position: scrollPosition,
-        is_last_read: isLastRead,
-        updated_at: new Date().toISOString(),
-      }, { onConflict: 'user_id,novel_id,chapter_local_id' });
+    promises.push(
+      supabase
+        .from('reading_progress')
+        .upsert({
+          user_id: userId,
+          novel_id: novelRow.id,
+          chapter_local_id: chapterLocalId,
+          scroll_position: scrollPosition,
+          is_last_read: isLastRead,
+          updated_at: new Date().toISOString(),
+        }, { onConflict: 'user_id,novel_id,chapter_local_id' })
+    );
+
+    await Promise.all(promises);
   } catch (err) {
     console.error('Failed to sync progress:', err);
   }
