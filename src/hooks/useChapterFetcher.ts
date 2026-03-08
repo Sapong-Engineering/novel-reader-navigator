@@ -16,7 +16,7 @@ export interface UseChapterFetcherResult {
   isFetching: boolean;
   progress: FetchProgress;
   fetchChapter: (chapter: Chapter, novel: Novel, onUpdate: (n: Novel) => void) => Promise<void>;
-  fetchAll: (novel: Novel, onUpdate: (n: Novel) => void) => Promise<void>;
+  fetchAll: (novel: Novel, onUpdate: (n: Novel) => void, onChapterFetched?: (novelId: string, chapter: Chapter) => void) => Promise<void>;
   cancel: () => void;
 }
 
