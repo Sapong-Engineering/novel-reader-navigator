@@ -1,8 +1,9 @@
 import { supabase } from '@/integrations/supabase/client';
-import { type Novel, type Chapter, getLibrary, saveNovel, deleteNovel as deleteLocalNovel } from './novel-store';
+import { type Novel, type Chapter, getLibrary, saveNovel, getNovel, deleteNovel as deleteLocalNovel } from './novel-store';
 import { getBookmarks, type Bookmark } from './bookmarks';
 import { getReadingProgress, saveReadingProgress, getLastReadChapter, saveLastReadChapter } from './storage-manager';
 import { setSyncStatus } from '@/hooks/useSyncStatus';
+import { enqueue, dequeue, getQueueLength, onConnectivityChange } from './offline-queue';
 
 // ── Caches ──
 
@@ -90,6 +91,7 @@ async function _syncProgressToBackend(
       }, { onConflict: 'user_id,novel_id,chapter_local_id' });
   } catch (err) {
     console.error('Failed to sync progress:', err);
+    enqueue('syncProgress', { novelLocalId, chapterLocalId, scrollPosition, isLastRead });
   }
 }
 
@@ -299,6 +301,11 @@ async function upsertNovelToBackend(novel: Novel, userId: string): Promise<void>
 }
 
 export async function syncNovel(novel: Novel): Promise<void> {
+  if (!navigator.onLine) {
+    enqueue('syncNovel', { novelId: novel.id });
+    setSyncStatus('idle');
+    return;
+  }
   const userId = await getUserId();
   if (!userId) return;
   setSyncStatus('syncing');
@@ -307,11 +314,17 @@ export async function syncNovel(novel: Novel): Promise<void> {
     setSyncStatus('done');
   } catch (err) {
     setSyncStatus('error');
+    enqueue('syncNovel', { novelId: novel.id });
     console.error('Failed to sync novel to backend:', err);
   }
 }
 
 export async function syncDeleteNovel(localId: string): Promise<void> {
+  if (!navigator.onLine) {
+    enqueue('deleteNovel', { localId });
+    setSyncStatus('idle');
+    return;
+  }
   const userId = await getUserId();
   if (!userId) return;
   setSyncStatus('syncing');
@@ -325,6 +338,7 @@ export async function syncDeleteNovel(localId: string): Promise<void> {
     setSyncStatus('done');
   } catch (err) {
     setSyncStatus('error');
+    enqueue('deleteNovel', { localId });
     console.error('Failed to delete novel from backend:', err);
   }
 }
@@ -358,6 +372,11 @@ export async function fetchChapterContentFromBackend(
 // ── Bookmarks ──
 
 export async function syncBookmarksToBackend(novelLocalId: string): Promise<void> {
+  if (!navigator.onLine) {
+    enqueue('syncBookmarks', { novelLocalId });
+    setSyncStatus('idle');
+    return;
+  }
   const userId = await getUserId();
   if (!userId) return;
   setSyncStatus('syncing');
@@ -388,6 +407,80 @@ export async function syncBookmarksToBackend(novelLocalId: string): Promise<void
     setSyncStatus('done');
   } catch (err) {
     setSyncStatus('error');
+    enqueue('syncBookmarks', { novelLocalId });
     console.error('Failed to sync bookmarks:', err);
   }
 }
+
+// ── Offline queue replay ──
+
+let isReplaying = false;
+
+export async function replayOfflineQueue(): Promise<void> {
+  if (isReplaying || !navigator.onLine) return;
+  const queueLen = getQueueLength();
+  if (queueLen === 0) return;
+
+  isReplaying = true;
+  setSyncStatus('syncing');
+  console.log(`[sync] Replaying ${queueLen} queued operations`);
+
+  try {
+    let op = dequeue();
+    while (op) {
+      try {
+        switch (op.type) {
+          case 'syncNovel': {
+            const novel = getNovel(op.payload.novelId as string);
+            if (novel) {
+              const userId = await getUserId();
+              if (userId) await upsertNovelToBackend(novel, userId);
+            }
+            break;
+          }
+          case 'deleteNovel': {
+            const userId = await getUserId();
+            if (userId) {
+              const localId = op.payload.localId as string;
+              novelUuidCache.delete(localId);
+              await supabase.from('novels').delete().eq('local_id', localId).eq('user_id', userId);
+            }
+            break;
+          }
+          case 'syncBookmarks': {
+            // Re-call the full function (it checks online status)
+            await syncBookmarksToBackend(op.payload.novelLocalId as string);
+            break;
+          }
+          case 'syncProgress': {
+            await _syncProgressToBackend(
+              op.payload.novelLocalId as string,
+              op.payload.chapterLocalId as string,
+              op.payload.scrollPosition as number,
+              op.payload.isLastRead as boolean,
+            );
+            break;
+          }
+        }
+      } catch (err) {
+        console.error(`[sync] Failed to replay op ${op.type}:`, err);
+        // Re-enqueue on failure if still offline-ish
+        if (!navigator.onLine) {
+          enqueue(op.type, op.payload);
+          break;
+        }
+      }
+      op = dequeue();
+    }
+    setSyncStatus('done');
+  } finally {
+    isReplaying = false;
+  }
+}
+
+// Auto-replay when coming back online
+onConnectivityChange((online) => {
+  if (online) {
+    replayOfflineQueue();
+  }
+});
