@@ -15,7 +15,7 @@ const FONT_FAMILIES: { value: ReaderSettings['fontFamily']; label: string }[] = 
   { value: 'monospace', label: 'Mono' },
 ];
 
-export function ReaderSettingsPopover() {
+export function ReaderSettingsPopover({ onRepairChapterOrder }: ReaderSettingsPopoverProps) {
   const { settings, setFontSize, setFontFamily, resetSettings } = useReaderContext();
 
   return (
