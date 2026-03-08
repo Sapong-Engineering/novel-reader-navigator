@@ -160,13 +160,25 @@ const ReaderView = ({
                 fontFamily: 'var(--reader-font-family, serif)',
               }}
             >
-              {chapter.content.split('\n\n').map((para, i) =>
-                para.trim() && (
-                  <p key={i} className={i === 0 ? 'reader-first-paragraph' : ''}>
-                    {para.trim()}
-                  </p>
-                )
-              )}
+          {(() => {
+            const isChapterTitle = (text: string) => {
+              const t = text.trim();
+              return /^(chapter|ch\.?|episode|part|book|volume)\s+\d+/i.test(t)
+                || (t.length < 50 && /^[#*]/.test(t));
+            };
+            let foundFirst = false;
+            return chapter.content.split('\n\n').map((para, i) => {
+              const trimmed = para.trim();
+              if (!trimmed) return null;
+              const isFirst = !foundFirst && !isChapterTitle(trimmed) && trimmed.length > 30;
+              if (isFirst) foundFirst = true;
+              return (
+                <p key={i} className={isFirst ? 'reader-first-paragraph' : ''}>
+                  {trimmed}
+                </p>
+              );
+            });
+          })()}
             </div>
           ) : (
             <p className="text-muted-foreground font-sans-ui italic text-center py-12">
