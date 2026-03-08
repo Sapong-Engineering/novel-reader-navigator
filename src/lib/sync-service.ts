@@ -474,6 +474,7 @@ export async function syncChapterToBackend(novelLocalId: string, chapter: Chapte
 // ── Sync full novel from backend (with chapter content) ──
 
 export async function syncFullNovelFromBackend(novelLocalId: string): Promise<Novel | null> {
+  if (!isSyncEnabled()) return null;
   const userId = await getUserId();
   if (!userId) return null;
   try {

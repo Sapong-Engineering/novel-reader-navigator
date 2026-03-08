@@ -143,11 +143,12 @@ const Index = () => {
       {/* Top bar */}
       <div className="flex items-center justify-end px-4 py-3 gap-2">
         {user && (
-          <Button variant="ghost" size="icon" onClick={handleManualSync} disabled={isSyncing} aria-label="Sync library">
+          <Button variant="ghost" size="icon" onClick={handleManualSync} disabled={isSyncing || !appSettings.syncEnabled} aria-label="Sync library">
             <RefreshCw className={`w-4 h-4 ${isSyncing ? 'animate-spin' : ''}`} />
           </Button>
         )}
         <SyncIndicator />
+        <SettingsPanel onSync={user ? handleManualSync : undefined} />
         {authLoading ? null : user ? (
           <>
             <span className="text-xs text-muted-foreground truncate max-w-[200px]">{user.email}</span>

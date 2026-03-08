@@ -96,7 +96,7 @@ const Reader = () => {
         });
       }
     });
-  }, [novelId, navigate]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [novelId, navigate, appSettings.syncEnabled]); // eslint-disable-line react-hooks/exhaustive-deps
 
   async function handleSelectChapter(chapter: Chapter) {
     if (chapter.content) {
