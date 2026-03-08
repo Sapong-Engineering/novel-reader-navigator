@@ -24,6 +24,8 @@ interface NovelToolbarProps {
   fetchProgress?: { current: number; total: number };
   mobileChapterDrawer?: ReactNode;
   showReaderSettings?: boolean;
+  onSync?: () => void;
+  onRepairChapterOrder?: () => void;
 }
 
 const NovelToolbar = ({
