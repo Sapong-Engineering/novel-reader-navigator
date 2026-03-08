@@ -51,7 +51,7 @@ export function useChapterFetcher(): UseChapterFetcherResult {
   );
 
   const fetchAll = useCallback(
-    async (novel: Novel, onUpdate: (n: Novel) => void) => {
+    async (novel: Novel, onUpdate: (n: Novel) => void, onChapterFetched?: (novelId: string, chapter: Chapter) => void) => {
       const unfetched = novel.chapters.filter(c => !c.content);
       if (unfetched.length === 0) {
         toast.info('All chapters already fetched!');
