@@ -14,7 +14,7 @@ import {
 import { syncLibraryFromBackend, syncNovel, syncDeleteNovel } from '@/lib/sync-service';
 import { orderChapters } from '@/lib/chapter-order';
 import { useAuth } from '@/hooks/useAuth';
-import { BookOpen, LogOut, LogIn, Loader2, WifiOff } from 'lucide-react';
+import { BookOpen, LogOut, LogIn, Loader2, WifiOff, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import SyncIndicator from '@/components/SyncIndicator';
 
@@ -115,10 +115,30 @@ const Index = () => {
     toast.success('Signed out');
   }, [signOut]);
 
+  const handleManualSync = useCallback(async () => {
+    if (!user) return;
+    setIsSyncing(true);
+    toast.info('Syncing library...');
+    try {
+      const novels = await syncLibraryFromBackend();
+      setLibrary(novels);
+      toast.success('Library synced!');
+    } catch {
+      toast.error('Sync failed');
+    } finally {
+      setIsSyncing(false);
+    }
+  }, [user]);
+
   return (
     <div id="main-content" className="min-h-screen bg-background">
       {/* Top bar */}
       <div className="flex items-center justify-end px-4 py-3 gap-2">
+        {user && (
+          <Button variant="ghost" size="icon" onClick={handleManualSync} disabled={isSyncing} aria-label="Sync library">
+            <RefreshCw className={`w-4 h-4 ${isSyncing ? 'animate-spin' : ''}`} />
+          </Button>
+        )}
         <SyncIndicator />
         {authLoading ? null : user ? (
           <>

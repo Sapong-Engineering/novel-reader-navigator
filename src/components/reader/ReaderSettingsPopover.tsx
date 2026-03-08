@@ -1,9 +1,13 @@
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
-import { Minus, Plus, RotateCcw } from 'lucide-react';
+import { Minus, Plus, RotateCcw, ListOrdered } from 'lucide-react';
 import { useReaderContext } from '@/contexts/ReaderContext';
 import type { ReaderSettings } from '@/contexts/ReaderContext';
+
+interface ReaderSettingsPopoverProps {
+  onRepairChapterOrder?: () => void;
+}
 
 const FONT_FAMILIES: { value: ReaderSettings['fontFamily']; label: string }[] = [
   { value: 'serif', label: 'Serif' },
@@ -11,7 +15,7 @@ const FONT_FAMILIES: { value: ReaderSettings['fontFamily']; label: string }[] = 
   { value: 'monospace', label: 'Mono' },
 ];
 
-export function ReaderSettingsPopover() {
+export function ReaderSettingsPopover({ onRepairChapterOrder }: ReaderSettingsPopoverProps) {
   const { settings, setFontSize, setFontFamily, resetSettings } = useReaderContext();
 
   return (
@@ -89,6 +93,21 @@ export function ReaderSettingsPopover() {
           <RotateCcw className="w-3 h-3 mr-1.5" />
           Reset defaults
         </Button>
+
+        {onRepairChapterOrder && (
+          <>
+            <Separator />
+            <Button
+              variant="ghost"
+              size="sm"
+              className="w-full h-7 text-xs text-muted-foreground font-sans-ui"
+              onClick={onRepairChapterOrder}
+            >
+              <ListOrdered className="w-3 h-3 mr-1.5" />
+              Repair chapter order
+            </Button>
+          </>
+        )}
       </PopoverContent>
     </Popover>
   );

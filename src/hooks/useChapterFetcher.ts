@@ -16,7 +16,7 @@ export interface UseChapterFetcherResult {
   isFetching: boolean;
   progress: FetchProgress;
   fetchChapter: (chapter: Chapter, novel: Novel, onUpdate: (n: Novel) => void) => Promise<void>;
-  fetchAll: (novel: Novel, onUpdate: (n: Novel) => void) => Promise<void>;
+  fetchAll: (novel: Novel, onUpdate: (n: Novel) => void, onChapterFetched?: (novelId: string, chapter: Chapter) => void) => Promise<void>;
   cancel: () => void;
 }
 
@@ -51,7 +51,7 @@ export function useChapterFetcher(): UseChapterFetcherResult {
   );
 
   const fetchAll = useCallback(
-    async (novel: Novel, onUpdate: (n: Novel) => void) => {
+    async (novel: Novel, onUpdate: (n: Novel) => void, onChapterFetched?: (novelId: string, chapter: Chapter) => void) => {
       const unfetched = novel.chapters.filter(c => !c.content);
       if (unfetched.length === 0) {
         toast.info('All chapters already fetched!');
@@ -79,6 +79,7 @@ export function useChapterFetcher(): UseChapterFetcherResult {
           };
           saveNovel(currentNovel);
           onUpdate(currentNovel);
+          onChapterFetched?.(novel.id, updated);
         },
         (completed, total) => {
           setProgress(prev => ({ ...prev, current: completed, total }));

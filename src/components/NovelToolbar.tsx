@@ -1,7 +1,7 @@
 import { ReactNode } from 'react';
 import { Button } from '@/components/ui/button';
 import SyncIndicator from '@/components/SyncIndicator';
-import { Download, FileText, Save, BookOpen, Loader2, CloudDownload } from 'lucide-react';
+import { Download, FileText, Save, BookOpen, Loader2, CloudDownload, RefreshCw } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -24,6 +24,8 @@ interface NovelToolbarProps {
   fetchProgress?: { current: number; total: number };
   mobileChapterDrawer?: ReactNode;
   showReaderSettings?: boolean;
+  onSync?: () => void;
+  onRepairChapterOrder?: () => void;
 }
 
 const NovelToolbar = ({
@@ -39,6 +41,8 @@ const NovelToolbar = ({
   fetchProgress,
   mobileChapterDrawer,
   showReaderSettings = false,
+  onSync,
+  onRepairChapterOrder,
 }: NovelToolbarProps) => {
   const progressPercent = fetchProgress?.total ? (fetchProgress.current / fetchProgress.total) * 100 : 0;
 
@@ -83,7 +87,13 @@ const NovelToolbar = ({
 
         <SyncIndicator />
 
-        {showReaderSettings && <ReaderSettingsPopover />}
+        {showReaderSettings && <ReaderSettingsPopover onRepairChapterOrder={onRepairChapterOrder} />}
+
+        {onSync && (
+          <Button variant="outline" size="icon" onClick={onSync} className="font-sans-ui" aria-label="Sync">
+            <RefreshCw className="w-4 h-4" />
+          </Button>
+        )}
 
         <Button variant="outline" size="sm" onClick={onSave} className="font-sans-ui hidden sm:inline-flex">
           <Save className="w-4 h-4 mr-2" />

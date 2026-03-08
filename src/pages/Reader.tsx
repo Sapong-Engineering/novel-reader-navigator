@@ -7,7 +7,7 @@ import NovelToolbar from '@/components/NovelToolbar';
 import MobileChapterDrawer from '@/components/MobileChapterDrawer';
 import ErrorBoundary from '@/components/ErrorBoundary';
 import { type Novel, type Chapter, saveNovel, getNovel } from '@/lib/novel-store';
-import { syncNovel, syncBookmarksToBackend, syncProgressToBackend, fetchChapterContentFromBackend } from '@/lib/sync-service';
+import { syncNovel, syncBookmarksToBackend, syncProgressToBackend, fetchChapterContentFromBackend, syncChapterToBackend } from '@/lib/sync-service';
 import { exportToPdfWithProgress, exportToDocxWithProgress } from '@/lib/export-service';
 import { useChapterNavigation } from '@/hooks/useChapterNavigation';
 import { useChapterFetcher } from '@/hooks/useChapterFetcher';
@@ -178,9 +178,13 @@ const Reader = () => {
     if (!novel || isFetchingAll) return;
     await fetchAll(novel, (updatedNovel) => {
       setNovel(updatedNovel);
-      syncNovel(updatedNovel); // sync after batch
+    }, (novelId, chapter) => {
+      syncChapterToBackend(novelId, chapter);
     });
-  }, [novel, isFetchingAll, fetchAll]);
+    // Final full sync after batch completes
+    const latest = getNovel(novelIdStr);
+    if (latest) syncNovel(latest);
+  }, [novel, isFetchingAll, fetchAll, novelIdStr]);
 
   const handleSave = useCallback(() => {
     if (novel) {
@@ -188,6 +192,27 @@ const Reader = () => {
       syncNovel(novel);
       toast.success('Novel saved!');
     }
+  }, [novel]);
+
+  const handleManualSync = useCallback(async () => {
+    if (!novel) return;
+    toast.info('Syncing...');
+    try {
+      await syncNovel(novel);
+      toast.success('Sync complete!');
+    } catch {
+      toast.error('Sync failed');
+    }
+  }, [novel]);
+
+  const handleRepairChapterOrder = useCallback(() => {
+    if (!novel) return;
+    const sorted = orderChapters(novel.chapters);
+    const repairedNovel: Novel = { ...novel, chapters: sorted };
+    saveNovel(repairedNovel);
+    setNovel(repairedNovel);
+    syncNovel(repairedNovel);
+    toast.success('Chapter order repaired');
   }, [novel]);
 
   const handleExportPdf = useCallback(async () => {
@@ -235,6 +260,8 @@ const Reader = () => {
         onFetchAll={handleFetchAll}
         isFetchingAll={isFetchingAll}
         fetchProgress={fetchProgress}
+        onSync={handleManualSync}
+        onRepairChapterOrder={handleRepairChapterOrder}
         showReaderSettings
         mobileChapterDrawer={
           <MobileChapterDrawer
