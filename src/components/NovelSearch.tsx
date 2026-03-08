@@ -1,9 +1,9 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { Search, Loader2, Plus, Globe } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { searchNovels, type SearchResult } from '@/lib/api/firecrawl';
+import { searchNovels, getActiveSources, type SearchResult, type ActiveSource } from '@/lib/api/firecrawl';
 import { toast } from 'sonner';
 
 interface NovelSearchProps {
@@ -22,6 +22,11 @@ const NovelSearch = ({ onAddNovel, isAddingNovel }: NovelSearchProps) => {
   const [results, setResults] = useState<SearchResult[]>([]);
   const [isSearching, setIsSearching] = useState(false);
   const [addingUrl, setAddingUrl] = useState<string | null>(null);
+  const [activeSources, setActiveSources] = useState<ActiveSource[]>([]);
+
+  useEffect(() => {
+    getActiveSources().then(setActiveSources).catch(() => {});
+  }, []);
 
   const handleSearch = useCallback(async () => {
     if (query.trim().length < 2) {
@@ -67,6 +72,25 @@ const NovelSearch = ({ onAddNovel, isAddingNovel }: NovelSearchProps) => {
           {isSearching ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Search'}
         </Button>
       </form>
+
+      {activeSources.length > 0 && (
+        <div className="flex items-center gap-2 flex-wrap">
+          <span className="text-[11px] text-muted-foreground font-sans-ui">Sources:</span>
+          {activeSources.map((source) => (
+            <Badge
+              key={source.key}
+              variant="outline"
+              className={`text-[10px] px-1.5 py-0 ${
+                source.enabled
+                  ? sourceColors[source.label] || 'bg-primary/10 text-primary border-primary/20'
+                  : 'bg-muted/50 text-muted-foreground/50 border-border/50 line-through'
+              }`}
+            >
+              {source.label}
+            </Badge>
+          ))}
+        </div>
+      )}
 
       {results.length > 0 && (
         <div className="space-y-2">
