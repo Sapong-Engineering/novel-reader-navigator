@@ -7,6 +7,8 @@ export interface AppSettings {
   notifyNewChapters: boolean;
   autoFetchNewChapters: boolean;
   refreshIntervalHours: number;
+  soundEnabled: boolean;
+  browserNotificationsEnabled: boolean;
 }
 
 export interface AppSettingsContextValue extends AppSettings {
