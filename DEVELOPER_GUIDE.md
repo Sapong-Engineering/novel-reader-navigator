@@ -928,50 +928,208 @@ Reader display preferences, applied as CSS custom properties.
 
 ---
 
-## Appendix: File Index
+## 9. Security & Sanitization
 
-### Core Library (`src/lib/`)
+### 9.1 Content Sanitization Pipeline
 
-| File                  | Lines | Purpose                          |
-|-----------------------|-------|----------------------------------|
-| `novel-store.ts`      | 69    | localStorage novel CRUD          |
-| `sync-service.ts`     | 620   | Backend sync engine              |
-| `offline-queue.ts`    | 95    | Offline operation queue          |
-| `storage-manager.ts`  | 137   | Storage quota + reading progress |
-| `background-fetch.ts` | 102   | Batch chapter fetcher            |
-| `notify.ts`           | 201   | Multi-channel notifications      |
-| `bookmarks.ts`        | 67    | Bookmark localStorage CRUD       |
-| `chapter-order.ts`    | 38    | Chapter sorting logic            |
-| `export-service.ts`   | 121   | PDF/DOCX export pipeline         |
-| `validation.ts`       | —     | Input validation utilities       |
-| `api/firecrawl.ts`    | 74    | Edge function client wrappers    |
-| `api/admin.ts`        | —     | Admin API client                 |
-| `utils/rate-limiter.ts`| 80   | Token bucket rate limiter        |
-| `utils/batch-fetcher.ts`| 78  | Parallel batch processor         |
-| `utils/retry-handler.ts`| 88  | Exponential backoff retry        |
+Scraped content passes through multiple sanitization layers before reaching the user:
 
-### Hooks (`src/hooks/`)
+```
+Firecrawl API response (raw markdown)
+    │
+    ├─► chapter-cleaner.ts        (Edge Function — server-side)
+    │   ├─ Site-specific cleaning (WuxiaClick, NovelBin, EmpireNovel)
+    │   ├─ Generic nav/breadcrumb removal
+    │   ├─ Cookie banner stripping
+    │   └─ Trailing site chrome removal
+    │
+    ├─► sanitization.ts           (Edge Function — shared module)
+    │   ├─ sanitizeHtml(): Remove <script>, <iframe>, <object>, <embed>,
+    │   │   <form>, <input>, <style>, <meta>, <link> tags
+    │   ├─ Strip on* event handler attributes
+    │   └─ Neutralize javascript: and data: hrefs
+    │
+    └─► validation.ts             (Client-side — URL input)
+        ├─ Block javascript:, data:, vbscript: protocols
+        ├─ Enforce https:// / http:// only
+        └─ Max URL length 2048 chars
+```
 
-| File                      | Purpose                        |
-|--------------------------|--------------------------------|
-| `useAuth.ts`             | Authentication state           |
-| `useReadingStats.ts`     | Time/chapter tracking          |
-| `useReadingLists.ts`     | Reading list CRUD              |
-| `useTTS.ts`              | Text-to-Speech                 |
-| `useImmersiveMode.ts`    | Immersive reading mode         |
-| `useBookmarks.ts`        | Bookmark management            |
-| `useChapterNavigation.ts`| Prev/next + keyboard nav       |
-| `useChapterFetcher.ts`   | Chapter content loading        |
-| `useChapterSearch.ts`    | Chapter title filtering        |
-| `useReadingProgress.ts`  | Scroll position persistence    |
-| `useSyncStatus.ts`       | Sync state broadcasting        |
+### 9.2 `shared/sanitization.ts` — HTML/Markdown Sanitization
 
-### Edge Functions (`supabase/functions/`)
+Server-side sanitization used in edge functions.
 
-| Function          | Purpose                            |
-|-------------------|------------------------------------|
-| `scrape-novel/`   | Scrape novel metadata + chapters   |
-| `scrape-chapter/` | Scrape single chapter content      |
-| `search-novels/`  | Multi-source novel search          |
-| `refresh-novels/` | Batch refresh + new chapter alerts |
-| `admin-api/`      | Admin operations                   |
+**`sanitizeHtml(html)`**:
+- Removes dangerous tags with content: `<script>`, `<iframe>`, `<object>`, `<embed>`, `<form>`, `<input>`, `<button>`, `<link>`, `<meta>`, `<style>`
+- Removes self-closing variants of the same tags
+- Strips all `on*` event handler attributes (both quoted and unquoted)
+- Replaces `javascript:` and `data:` hrefs with `href="#"`
+- Preserves safe formatting: headings, paragraphs, emphasis, lists, links
+
+**`sanitizeMarkdown(markdown)`**:
+- Removes embedded `<script>` tags within markdown
+- Converts `[text](javascript:...)` links to `[text](#)`
+- Converts `[text](data:...)` links to `[text](#)`
+- Strips inline HTML event handlers
+
+### 9.3 `shared/chapter-cleaner.ts` — Content Cleaning
+
+Site-specific cleanup for scraped chapter content. Each adapter has tailored rules:
+
+**WuxiaClick** (`cleanWuxiaClick`):
+- Finds the "Chapter N: Title" line and discards everything before it (removes site UI like emoji icons, "# CH N", "A+/A-" controls)
+- Strips watermarks ("Read at wuxia.click"), ratings, review counts, footer links
+- Removes translator/editor credit lines
+- Trims trailing short lines that look like site chrome (< 30 chars, not dialogue)
+
+**NovelBin** (`cleanNovelBin`):
+- Finds chapter title heading and discards preamble
+- Strips breadcrumb navigation, "Prev/Next Chapter" links
+- Removes rating indicators, "Novel info" sections
+- Cleans bottom-of-page image links to other novels
+
+**EmpireNovel** (`cleanEmpireNovel`):
+- Removes site branding headers
+- Strips ad placeholders
+
+**Generic** (all sites):
+- Removes Previous/Next Chapter links (both markdown links and text)
+- Strips breadcrumb lines (`Home > Novel > Chapter`)
+- Removes cookie/consent banners
+- Cleans standalone URL lines, empty headings, excessive newlines
+- Ensures chapter title lines have double-newline separation from body
+
+### 9.4 `shared/cache.ts` — In-Memory LRU Cache
+
+Generic cache used by edge functions with TTL expiration and LRU eviction.
+
+| Property/Method     | Purpose                                        |
+|---------------------|------------------------------------------------|
+| `get(key)`          | Retrieve value; returns `undefined` if expired |
+| `set(key, value)`   | Store with TTL; evicts LRU entry if at max     |
+| `has(key)`          | Check existence (respects TTL)                 |
+| `delete(key)`       | Manual removal                                 |
+| `clear()`           | Remove all entries                             |
+| `Cache.keyFromUrl()`| Static: normalize URL to lowercase trimmed key |
+
+**Singleton instances**:
+- `novelInfoCache`: TTL 24h, max 50 entries (novel metadata)
+- `chapterContentCache`: TTL 24h, max 500 entries (chapter text)
+
+**Eviction strategy**: When `maxSize` is reached, the least-recently-accessed entry is removed (`lastAccessedAt` tracking).
+
+### 9.5 Authentication & Authorization
+
+| Layer          | Mechanism                                          |
+|---------------|---------------------------------------------------|
+| Client auth   | `useAuth()` hook → `supabase.auth` (email/password) |
+| Row isolation  | RLS policies with `auth.uid() = user_id` checks   |
+| Admin gating   | `has_role(auth.uid(), 'admin')` — `SECURITY DEFINER` function |
+| Edge functions | JWT verification via user-scoped Supabase client   |
+| Profile creation | `handle_new_user()` trigger on `auth.users` insert |
+
+**Critical**: Admin status is **never** checked client-side via localStorage or hardcoded credentials. All admin verification happens server-side through RLS policies and the `has_role()` function.
+
+---
+
+## 10. PWA Configuration
+
+### 10.1 Setup
+
+PWA is configured via `vite-plugin-pwa` in `vite.config.ts`.
+
+| Setting             | Value                                           |
+|---------------------|------------------------------------------------|
+| Register type       | `autoUpdate` (service worker updates silently) |
+| Display mode        | `standalone` (hides browser UI)                |
+| Orientation         | `portrait-primary`                             |
+| Theme color         | `#b5652a`                                      |
+| Background color    | `#f5f0eb`                                      |
+| Start URL           | `/`                                            |
+
+### 10.2 Icons
+
+| File                   | Size      | Purpose         |
+|------------------------|-----------|-----------------|
+| `public/pwa-192x192.png` | 192×192 | App icon        |
+| `public/pwa-512x512.png` | 512×512 | Splash / maskable |
+| `public/favicon.ico`     | —       | Browser tab icon |
+
+### 10.3 Workbox Caching
+
+**Precaching**: All `*.{js,css,html,ico,png,svg,woff2}` files are precached at install time.
+
+**Runtime caching**:
+
+| URL Pattern                          | Strategy     | Cache Name              | Max Age  |
+|--------------------------------------|-------------|-------------------------|----------|
+| `fonts.googleapis.com/*`             | CacheFirst  | `google-fonts-cache`    | 1 year   |
+| `fonts.gstatic.com/*`               | CacheFirst  | `gstatic-fonts-cache`   | 1 year   |
+
+**Navigation denylist**: `/~oauth` paths are excluded from the service worker's navigation fallback to prevent interference with auth redirects.
+
+### 10.4 Offline Capabilities
+
+The PWA shell (HTML/CSS/JS) works offline. Data availability depends on what's cached in localStorage:
+- **Novel library**: Fully available offline (localStorage)
+- **Chapter content**: Available if previously fetched and cached locally
+- **Sync operations**: Queued in `offline_sync_queue` and replayed when online
+- **Search/scraping**: Requires network (edge function calls)
+
+---
+
+## 11. Error Handling
+
+### 11.1 `ErrorBoundary` Component
+
+**File**: `src/components/ErrorBoundary.tsx`
+
+A React class component that wraps the entire app (`App.tsx` root). Catches unhandled errors in the React component tree.
+
+**Behavior**:
+1. `getDerivedStateFromError()` — Sets `hasError: true` and captures the error object
+2. `componentDidCatch()` — Logs error and component stack trace to `console.error`
+3. **Default fallback UI**: Centered card with:
+   - "Something went wrong" heading (uses `text-destructive` semantic token)
+   - Error message text (uses `text-muted-foreground`)
+   - "Try again" button that resets the error state
+4. **Custom fallback**: Accepts optional `fallback` prop for custom error UI
+
+**Usage in App.tsx**:
+```tsx
+<ErrorBoundary>
+  <ThemeProvider>
+    ...entire app tree...
+  </ThemeProvider>
+</ErrorBoundary>
+```
+
+### 11.2 Error Handling Patterns
+
+| Layer               | Pattern                                           | File                      |
+|--------------------|---------------------------------------------------|---------------------------|
+| React render       | `ErrorBoundary` catches + shows fallback UI       | `ErrorBoundary.tsx`       |
+| Storage writes     | `safePersist()` catches `QuotaExceededError`       | `novel-store.ts`          |
+| Network/sync       | Try-catch → `enqueue()` for offline retry          | `sync-service.ts`         |
+| Chapter scraping   | `withRetry()` with exponential backoff             | `retry-handler.ts`        |
+| Edge functions     | Try-catch → JSON error response with status code   | All edge functions        |
+| Auth               | Error message returned from `signUp`/`signIn`      | `useAuth.ts`              |
+| Toast notifications| Sonner toast for user-facing errors                 | Throughout via `notify.ts`|
+
+### 11.3 Sync Error Recovery
+
+```
+Error occurs during sync
+    │
+    ├─ Online? ──► Log error + show SyncErrorBanner
+    │              setSyncStatus('error')
+    │              User can dismiss via dismissSyncError()
+    │
+    └─ Offline? ──► enqueue(operation) to offline queue
+                    setSyncStatus('idle')
+                    Auto-replay when window 'online' event fires
+```
+
+---
+
+## 12. Troubleshooting Guide
