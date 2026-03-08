@@ -1136,3 +1136,234 @@ Error occurs during sync
 ---
 
 ## 12. Troubleshooting Guide
+
+### 12.1 Novel Scraping Fails
+
+**Symptom**: "Failed to scrape novel" or "Firecrawl not configured" error.
+
+**Checklist**:
+1. **Check `FIRECRAWL_API_KEY` secret** — Must be set in Lovable Cloud secrets. Verify it's a valid key.
+2. **Check edge function logs** — Look for `Firecrawl error:` log entries.
+3. **URL format** — Ensure the URL points to a novel's main page (not a chapter page). The URL is auto-prefixed with `https://` if missing.
+4. **Adapter coverage** — If the site isn't WuxiaClick or NovelBin, the default adapter attempts generic extraction. It may not work well on all sites.
+5. **Cache** — Stale cached results may return old data. In-memory cache clears on edge function cold start.
+
+**Files**: `supabase/functions/scrape-novel/index.ts`, `src/lib/api/firecrawl.ts`
+
+### 12.2 Chapter Content Not Loading
+
+**Symptom**: Blank chapter view, or perpetual loading spinner.
+
+**Checklist**:
+1. **Fetch cascade**: The system tries three sources in order:
+   - Local cache (`novel.chapters[i].content`)
+   - Backend DB (`fetchChapterContentFromBackend()`)
+   - Live scrape (`scrapeChapterContent()` edge function)
+2. **Check console** for `Failed to fetch chapter content from backend:` or `Failed to scrape chapter`.
+3. **Content cleaning** may strip too aggressively — check `shared/chapter-cleaner.ts`.
+4. **Rate limiting** — If fetching many chapters, the `RateLimiter` (2 req/s, 3 concurrent) may cause delays. This is by design to avoid API throttling.
+
+**Files**: `src/hooks/useChapterFetcher.ts`, `src/lib/sync-service.ts:399–421`, `supabase/functions/scrape-chapter/index.ts`
+
+### 12.3 Sync Not Working
+
+**Symptom**: Data doesn't appear on other devices, sync indicator shows error.
+
+**Checklist**:
+1. **Auth required** — Sync only works for authenticated users. Check `useAuth().user` is not null.
+2. **Sync enabled** — Verify `AppSettings.syncEnabled` is `true` (check `localStorage['novel-app-settings']`).
+3. **`isSyncEnabled()`** — Called at the top of every sync function (`src/lib/notify.ts:159`). Returns `false` if sync is disabled.
+4. **Network** — If offline, operations are queued in `localStorage['offline_sync_queue']`. Check `getQueueLength()`.
+5. **RLS policies** — Ensure the user_id in the token matches the data's user_id. Use console to check for `403` or `new row violates row-level security` errors.
+6. **1000-row limit** — The sync system uses `fetchAllRows()` with pagination. If chapters seem to be missing, verify paginated fetch is working (check for range errors in network tab).
+7. **UUID cache stale** — If a novel was deleted and re-added, `novelUuidCache` may have stale entries. Signing out and back in clears the cache.
+
+**Files**: `src/lib/sync-service.ts`, `src/hooks/useSyncStatus.ts`, `src/lib/offline-queue.ts`
+
+### 12.4 Storage Quota Exceeded
+
+**Symptom**: "Storage is full" toast, or novels failing to save silently.
+
+**Checklist**:
+1. **localStorage limit** — Most browsers allow ~5–10MB. Novel content is stored as UTF-16 (2 bytes per character).
+2. **Check quota**: Call `getQuota()` from `src/lib/storage-manager.ts` in the console.
+3. **Remove unused novels** — Each novel with all chapters can consume several MB.
+4. **`safePersist()`** in `novel-store.ts` catches `QuotaExceededError` and shows a toast.
+5. **`saveNovelWithQuotaCheck()`** in `storage-manager.ts` does a pre-flight check before writing.
+
+**Files**: `src/lib/novel-store.ts:24–36`, `src/lib/storage-manager.ts`
+
+### 12.5 Chapters Out of Order
+
+**Symptom**: Chapters appear in wrong sequence.
+
+**Checklist**:
+1. **sort_order** — Backend chapters have `sort_order` (integer). Set during initial sync.
+2. **`chapter-order.ts`** — Extracts chapter numbers via regex from title/id/url. Falls back to `localeCompare`.
+3. **Backend vs. local ordering** — Backend `sort_order` takes priority during sync. Local-only chapters are appended at the end.
+4. **Tie-breaking** — If `sort_order` values are equal, `compareChapterOrder()` uses natural number extraction.
+
+**Files**: `src/lib/chapter-order.ts`, `src/lib/sync-service.ts:221–228`
+
+### 12.6 TTS Not Working
+
+**Symptom**: No audio when playing TTS, or voice list is empty.
+
+**Checklist**:
+1. **Browser support** — `speechSynthesis` API is not available in all browsers. Check `'speechSynthesis' in window`.
+2. **Voice loading** — Voices load asynchronously. The hook listens for `voiceschanged` event.
+3. **English filter** — Only voices with `lang.startsWith('en')` are shown. Non-English users see no voices.
+4. **Chrome bug** — Chrome sometimes requires a user gesture before `speechSynthesis.speak()` works. The play button click should satisfy this.
+5. **Content format** — Content is split on `\n\n`. If chapter content uses `\n` (single newlines), paragraphs won't split correctly.
+
+**Files**: `src/hooks/useTTS.ts`, `src/components/reader/TTSControls.tsx`
+
+### 12.7 Notifications Not Appearing
+
+**Symptom**: No toasts, no notification bell updates.
+
+**Checklist**:
+1. **`notificationsEnabled`** — Check `AppSettings.notificationsEnabled` is `true`.
+2. **`notifyNewChapters`** — Specifically for chapter update notifications.
+3. **Browser Notifications** — Requires explicit permission via `Notification.requestPermission()`. Check `browserNotificationsEnabled` setting.
+4. **Chapter updates** — The `refresh-novels/` edge function inserts `chapter_updates` rows. If it hasn't run, there's nothing to notify about.
+5. **Sound** — Requires `AudioContext`. Some browsers block audio until user interaction.
+
+**Files**: `src/lib/notify.ts`, `src/components/NotificationCenter.tsx`, `src/contexts/AppSettingsContext.tsx`
+
+### 12.8 Admin Panel Access Denied
+
+**Symptom**: Admin page shows access denied or redirects.
+
+**Checklist**:
+1. **Role assignment** — User must have a row in `user_roles` with `role = 'admin'`.
+2. **`has_role()` function** — `SECURITY DEFINER` function that bypasses RLS. If it doesn't exist, all admin policies will fail.
+3. **Check role assignment**: Query `user_roles` table directly (requires service role key or admin access).
+4. **Never check admin status client-side** — Always verified via RLS policies and `has_role()`.
+
+**Files**: `src/pages/Admin.tsx`, `src/lib/api/admin.ts`, `supabase/functions/admin-api/index.ts`
+
+### 12.9 Background Fetch Stalls
+
+**Symptom**: Fetch-all progress bar stops advancing.
+
+**Checklist**:
+1. **Rate limiter exhaustion** — The `RateLimiter` allows 2 req/s with 3 concurrent. Large backlogs will be slow.
+2. **Retry exhaustion** — `withRetry()` attempts 3 times with exponential backoff (1s, 2s, 4s). After 3 failures, the chapter is skipped.
+3. **Cancel state** — Check if `batchFetcher.cancel()` was called (e.g., navigating away).
+4. **Firecrawl rate limits** — The Firecrawl API may return `429`. The retry handler respects `Retry-After` headers.
+5. **Console logs** — Look for `[timestamp] Retry attempt X/Y after Zms` messages.
+
+**Files**: `src/lib/background-fetch.ts`, `src/lib/utils/rate-limiter.ts`, `src/lib/utils/retry-handler.ts`, `src/lib/utils/batch-fetcher.ts`
+
+### 12.10 Common Error Messages
+
+| Error Message | Source | Likely Cause |
+|--------------|--------|-------------|
+| `"Storage is full. Consider removing some novels..."` | `novel-store.ts:30` | localStorage quota exceeded |
+| `"Firecrawl not configured"` | Edge functions | `FIRECRAWL_API_KEY` secret missing |
+| `"Failed to sync novel to backend"` | `sync-service.ts:368` | Network error or RLS violation |
+| `"Failed after N attempts"` | `retry-handler.ts:83` | Repeated scraping failures |
+| `"Query must be at least 2 characters"` | `search-novels/` | Search query too short |
+| `"All adapters are disabled"` | `search-novels/` | All sources disabled in admin |
+| `"Unauthorized"` | `admin-api/` | Missing or invalid JWT token |
+| `"Forbidden: admin role required"` | `admin-api/` | User lacks admin role |
+| `"URL contains disallowed content"` | `validation.ts` | Malicious URL pattern detected |
+| `"URL must use http: or https: protocol"` | `validation.ts` | Non-HTTP protocol attempted |
+
+### 12.11 Debug Checklist
+
+1. **Console errors** — Open browser DevTools → Console. Filter for `[sync]`, `[refresh]`, `Retry attempt`.
+2. **Network tab** — Filter for `/functions/v1/` to see edge function calls and responses.
+3. **localStorage inspection** — Check keys: `novel-reader-library`, `offline_sync_queue`, `novel-app-settings`, `bookmarks:*`, `reading-progress:*`, `last-read:*`.
+4. **Edge function logs** — Available in Lovable Cloud backend view.
+5. **Sync state** — Import `useSyncStatus` and check current state, or look for `SyncIndicator` in the UI.
+6. **Service worker** — Check `Application → Service Workers` in DevTools. Unregister and refresh to clear stale PWA cache.
+7. **Auth state** — Run `supabase.auth.getSession()` in console to verify JWT validity.
+
+---
+
+## Appendix: File Index
+
+### Core Library (`src/lib/`)
+
+| File                  | Lines | Purpose                          |
+|-----------------------|-------|----------------------------------|
+| `novel-store.ts`      | 69    | localStorage novel CRUD          |
+| `sync-service.ts`     | 620   | Backend sync engine              |
+| `offline-queue.ts`    | 95    | Offline operation queue          |
+| `storage-manager.ts`  | 137   | Storage quota + reading progress |
+| `background-fetch.ts` | 102   | Batch chapter fetcher            |
+| `notify.ts`           | 201   | Multi-channel notifications      |
+| `bookmarks.ts`        | 67    | Bookmark localStorage CRUD       |
+| `chapter-order.ts`    | 38    | Chapter sorting logic            |
+| `export-service.ts`   | 121   | PDF/DOCX export with progress    |
+| `export-utils.ts`     | 86    | PDF/DOCX export (simple/legacy)  |
+| `validation.ts`       | 87    | URL validation & sanitization    |
+| `api/firecrawl.ts`    | 74    | Edge function client wrappers    |
+| `api/admin.ts`        | —     | Admin API client                 |
+| `utils/rate-limiter.ts`| 80   | Token bucket rate limiter        |
+| `utils/batch-fetcher.ts`| 78  | Parallel batch processor         |
+| `utils/retry-handler.ts`| 88  | Exponential backoff retry        |
+
+### Components (`src/components/`)
+
+| File / Directory          | Purpose                          |
+|--------------------------|----------------------------------|
+| `ErrorBoundary.tsx`      | Root error boundary (class component) |
+| `ReaderView.tsx`         | Chapter content renderer         |
+| `ChapterList.tsx`        | Chapter sidebar with search      |
+| `MobileChapterDrawer.tsx`| Mobile chapter drawer            |
+| `NovelCard.tsx`          | Library grid card                |
+| `NovelSearch.tsx`        | Novel search UI                  |
+| `NovelUrlInput.tsx`      | URL input for adding novels      |
+| `NovelToolbar.tsx`       | Reader toolbar (nav, TTS, immersive) |
+| `NotificationCenter.tsx` | Bell icon + notification list    |
+| `ReadingListManager.tsx` | List management UI               |
+| `ReadingStats.tsx`       | Stats dashboard                  |
+| `SettingsPanel.tsx`      | App settings dialog              |
+| `SyncIndicator.tsx`      | Sync status icon                 |
+| `SyncErrorBanner.tsx`    | Persistent sync error banner     |
+| `BackgroundFetchBanner.tsx`| Fetch-all progress bar          |
+| `AddToListMenu.tsx`      | Add novel to reading list menu   |
+| `reader/TTSControls.tsx` | TTS playback controls            |
+| `reader/ImmersiveOverlay.tsx`| Immersive mode overlay        |
+| `reader/ReaderSettingsPopover.tsx`| Font/display settings      |
+| `admin/Analytics.tsx`    | Admin analytics dashboard        |
+| `admin/UserManagement.tsx`| Admin user management           |
+| `admin/ContentModeration.tsx`| Admin content moderation     |
+| `admin/AdminPreferences.tsx`| Admin system preferences      |
+
+### Hooks (`src/hooks/`)
+
+| File                      | Purpose                        |
+|--------------------------|--------------------------------|
+| `useAuth.ts`             | Authentication state           |
+| `useReadingStats.ts`     | Time/chapter tracking          |
+| `useReadingLists.ts`     | Reading list CRUD              |
+| `useTTS.ts`              | Text-to-Speech                 |
+| `useImmersiveMode.ts`    | Immersive reading mode         |
+| `useBookmarks.ts`        | Bookmark management            |
+| `useChapterNavigation.ts`| Prev/next + keyboard nav       |
+| `useChapterFetcher.ts`   | Chapter content loading        |
+| `useChapterSearch.ts`    | Chapter title filtering        |
+| `useReadingProgress.ts`  | Scroll position persistence    |
+| `useSyncStatus.ts`       | Sync state broadcasting        |
+
+### Edge Functions (`supabase/functions/`)
+
+| Function          | Purpose                            |
+|-------------------|------------------------------------|
+| `scrape-novel/`   | Scrape novel metadata + chapters   |
+| `scrape-chapter/` | Scrape single chapter content      |
+| `search-novels/`  | Multi-source novel search          |
+| `refresh-novels/` | Batch refresh + new chapter alerts |
+| `admin-api/`      | Admin CRUD + analytics + settings  |
+
+### Shared Edge Function Modules (`supabase/functions/shared/`)
+
+| File                  | Purpose                                    |
+|-----------------------|--------------------------------------------|
+| `cache.ts`            | LRU cache with TTL (novel info + chapters) |
+| `chapter-cleaner.ts`  | Site-specific content cleaning             |
+| `sanitization.ts`     | HTML/Markdown XSS sanitization             |
