@@ -24,10 +24,22 @@ Deno.serve(async (req) => {
   const supabase = createClient(supabaseUrl, serviceRoleKey);
 
   try {
-    // Get all distinct novel URLs with their owner info
+    // Parse optional interval_hours from request body (default 24)
+    let intervalHours = 24;
+    try {
+      const body = await req.json();
+      if (body?.interval_hours && typeof body.interval_hours === 'number') {
+        intervalHours = Math.max(1, Math.min(168, body.interval_hours));
+      }
+    } catch { /* no body or invalid JSON — use default */ }
+
+    const cutoff = new Date(Date.now() - intervalHours * 60 * 60 * 1000).toISOString();
+
+    // Get novels not refreshed within the interval
     const { data: novels, error: novelsErr } = await supabase
       .from('novels')
       .select('id, local_id, url, user_id, updated_at')
+      .lt('updated_at', cutoff)
       .order('updated_at', { ascending: true })
       .limit(50);
 

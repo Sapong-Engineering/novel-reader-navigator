@@ -57,6 +57,7 @@ export function AppSettingsProvider({ children }: { children: ReactNode }) {
     setNotificationsEnabled: v => update({ notificationsEnabled: v }),
     setNotifyNewChapters: v => update({ notifyNewChapters: v }),
     setAutoFetchNewChapters: v => update({ autoFetchNewChapters: v }),
+    setRefreshIntervalHours: v => update({ refreshIntervalHours: v }),
     resetAll: () => setSettings(DEFAULTS),
   };
 
