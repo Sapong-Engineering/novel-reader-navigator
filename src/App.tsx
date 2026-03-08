@@ -28,8 +28,9 @@ const App = () => (
               <SyncErrorBanner />
               <BrowserRouter>
                 <Routes>
-                  <Route path="/" element={<Index />} />
+                <Route path="/" element={<Index />} />
                   <Route path="/auth" element={<Auth />} />
+                  <Route path="/admin" element={<Admin />} />
                   <Route path="/reader/:novelId" element={<Reader />} />
                   <Route path="*" element={<NotFound />} />
                 </Routes>
