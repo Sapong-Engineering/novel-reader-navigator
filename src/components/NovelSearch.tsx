@@ -22,6 +22,11 @@ const NovelSearch = ({ onAddNovel, isAddingNovel }: NovelSearchProps) => {
   const [results, setResults] = useState<SearchResult[]>([]);
   const [isSearching, setIsSearching] = useState(false);
   const [addingUrl, setAddingUrl] = useState<string | null>(null);
+  const [activeSources, setActiveSources] = useState<ActiveSource[]>([]);
+
+  useEffect(() => {
+    getActiveSources().then(setActiveSources).catch(() => {});
+  }, []);
 
   const handleSearch = useCallback(async () => {
     if (query.trim().length < 2) {
