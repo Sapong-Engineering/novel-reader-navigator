@@ -17,6 +17,9 @@ import { useAuth } from '@/hooks/useAuth';
 import { BookOpen, LogOut, LogIn, Loader2, WifiOff, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import SyncIndicator from '@/components/SyncIndicator';
+import SettingsPanel from '@/components/SettingsPanel';
+import { useAppSettings } from '@/contexts/AppSettingsContext';
+import { isSyncEnabled } from '@/lib/notify';
 
 const Index = () => {
   const navigate = useNavigate();
@@ -25,6 +28,7 @@ const Index = () => {
   const [library, setLibrary] = useState<Novel[]>(() => getLibrary());
   const [isSyncing, setIsSyncing] = useState(false);
   const [isOnline, setIsOnline] = useState(navigator.onLine);
+  const appSettings = useAppSettings();
 
   // Track online/offline status
   useEffect(() => {
@@ -41,7 +45,7 @@ const Index = () => {
   // Sync library from backend when authenticated (guarded against double-fire)
   const syncedRef = useRef(false);
   useEffect(() => {
-    if (user && !authLoading && !syncedRef.current) {
+    if (user && !authLoading && !syncedRef.current && appSettings.syncEnabled) {
       syncedRef.current = true;
       setIsSyncing(true);
       syncLibraryFromBackend()
@@ -50,7 +54,7 @@ const Index = () => {
         .finally(() => setIsSyncing(false));
     }
     if (!user) syncedRef.current = false;
-  }, [user, authLoading]);
+  }, [user, authLoading, appSettings.syncEnabled]);
 
   const handleFetchNovel = useCallback(async (url: string) => {
     // Check if novel with same URL already exists
@@ -139,11 +143,12 @@ const Index = () => {
       {/* Top bar */}
       <div className="flex items-center justify-end px-4 py-3 gap-2">
         {user && (
-          <Button variant="ghost" size="icon" onClick={handleManualSync} disabled={isSyncing} aria-label="Sync library">
+          <Button variant="ghost" size="icon" onClick={handleManualSync} disabled={isSyncing || !appSettings.syncEnabled} aria-label="Sync library">
             <RefreshCw className={`w-4 h-4 ${isSyncing ? 'animate-spin' : ''}`} />
           </Button>
         )}
         <SyncIndicator />
+        <SettingsPanel onSync={user ? handleManualSync : undefined} />
         {authLoading ? null : user ? (
           <>
             <span className="text-xs text-muted-foreground truncate max-w-[200px]">{user.email}</span>

@@ -16,6 +16,7 @@ import { useBookmarks } from '@/hooks/useBookmarks';
 import { validateUrl } from '@/lib/validation';
 import { scrapeChapterContent } from '@/lib/api/firecrawl';
 import { orderChapters } from '@/lib/chapter-order';
+import { useAppSettings } from '@/contexts/AppSettingsContext';
 
 const Reader = () => {
   const { novelId } = useParams<{ novelId: string }>();
@@ -27,6 +28,7 @@ const Reader = () => {
   const forceScrollTopRef = useRef(false);
 
   const { isFetching: isFetchingAll, progress: fetchProgress, fetchAll } = useChapterFetcher();
+  const appSettings = useAppSettings();
 
   const handleNavSelectChapter = useCallback((chapter: Chapter) => {
     forceScrollTopRef.current = true;
@@ -73,6 +75,7 @@ const Reader = () => {
     }
 
     // Sync from backend to pick up new chapters (cron-discovered or from other devices)
+    if (!appSettings.syncEnabled) return;
     syncFullNovelFromBackend(novelId).then(synced => {
       if (synced) {
         setNovel(prev => {
@@ -93,7 +96,7 @@ const Reader = () => {
         });
       }
     });
-  }, [novelId, navigate]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [novelId, navigate, appSettings.syncEnabled]); // eslint-disable-line react-hooks/exhaustive-deps
 
   async function handleSelectChapter(chapter: Chapter) {
     if (chapter.content) {

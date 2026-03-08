@@ -5,6 +5,7 @@ import { getReadingProgress, saveReadingProgress, getLastReadChapter, saveLastRe
 import { setSyncStatus } from '@/hooks/useSyncStatus';
 import { enqueue, dequeue, getQueueLength, onConnectivityChange } from './offline-queue';
 import { compareChapterOrder, orderChapters } from './chapter-order';
+import { isSyncEnabled } from './notify';
 // ── Caches ──
 
 let cachedUserId: string | null = null;
@@ -153,6 +154,7 @@ async function getOrCreateNovelId(localId: string, userId: string, novel: Novel)
 // ── Novels ──
 
 export async function syncLibraryFromBackend(): Promise<Novel[]> {
+  if (!isSyncEnabled()) return getLibrary();
   const userId = await getUserId();
   if (!userId) return getLibrary();
   setSyncStatus('syncing');
@@ -331,6 +333,7 @@ async function upsertNovelToBackend(novel: Novel, userId: string): Promise<void>
 }
 
 export async function syncNovel(novel: Novel): Promise<void> {
+  if (!isSyncEnabled()) return;
   if (!navigator.onLine) {
     enqueue('syncNovel', { novelId: novel.id });
     setSyncStatus('idle');
@@ -350,6 +353,7 @@ export async function syncNovel(novel: Novel): Promise<void> {
 }
 
 export async function syncDeleteNovel(localId: string): Promise<void> {
+  if (!isSyncEnabled()) return;
   if (!navigator.onLine) {
     enqueue('deleteNovel', { localId });
     setSyncStatus('idle');
@@ -402,6 +406,7 @@ export async function fetchChapterContentFromBackend(
 // ── Bookmarks ──
 
 export async function syncBookmarksToBackend(novelLocalId: string): Promise<void> {
+  if (!isSyncEnabled()) return;
   if (!navigator.onLine) {
     enqueue('syncBookmarks', { novelLocalId });
     setSyncStatus('idle');
@@ -445,6 +450,7 @@ export async function syncBookmarksToBackend(novelLocalId: string): Promise<void
 // ── Single chapter sync ──
 
 export async function syncChapterToBackend(novelLocalId: string, chapter: Chapter): Promise<void> {
+  if (!isSyncEnabled()) return;
   const userId = await getUserId();
   if (!userId) return;
   try {
@@ -468,6 +474,7 @@ export async function syncChapterToBackend(novelLocalId: string, chapter: Chapte
 // ── Sync full novel from backend (with chapter content) ──
 
 export async function syncFullNovelFromBackend(novelLocalId: string): Promise<Novel | null> {
+  if (!isSyncEnabled()) return null;
   const userId = await getUserId();
   if (!userId) return null;
   try {
