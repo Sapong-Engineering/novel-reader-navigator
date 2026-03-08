@@ -6,6 +6,7 @@ export interface AppSettings {
   notificationsEnabled: boolean;
   notifyNewChapters: boolean;
   autoFetchNewChapters: boolean;
+  refreshIntervalHours: number;
 }
 
 export interface AppSettingsContextValue extends AppSettings {
