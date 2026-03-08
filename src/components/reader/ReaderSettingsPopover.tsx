@@ -1,9 +1,13 @@
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
-import { Minus, Plus, RotateCcw } from 'lucide-react';
+import { Minus, Plus, RotateCcw, ListOrdered } from 'lucide-react';
 import { useReaderContext } from '@/contexts/ReaderContext';
 import type { ReaderSettings } from '@/contexts/ReaderContext';
+
+interface ReaderSettingsPopoverProps {
+  onRepairChapterOrder?: () => void;
+}
 
 const FONT_FAMILIES: { value: ReaderSettings['fontFamily']; label: string }[] = [
   { value: 'serif', label: 'Serif' },
