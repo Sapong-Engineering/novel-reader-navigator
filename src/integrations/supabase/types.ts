@@ -63,6 +63,7 @@ export type Database = {
           local_id: string
           novel_id: string
           saved_at: string | null
+          sort_order: number
           title: string
           url: string
           user_id: string
@@ -74,6 +75,7 @@ export type Database = {
           local_id: string
           novel_id: string
           saved_at?: string | null
+          sort_order?: number
           title: string
           url: string
           user_id: string
@@ -85,6 +87,7 @@ export type Database = {
           local_id?: string
           novel_id?: string
           saved_at?: string | null
+          sort_order?: number
           title?: string
           url?: string
           user_id?: string
