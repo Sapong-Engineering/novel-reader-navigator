@@ -428,9 +428,51 @@ Request { query }
 
 ### 4.5 `admin-api/`
 
-**Purpose**: Administrative operations (user management, content moderation, analytics).
+**Purpose**: Centralized admin API handling user management, content moderation, analytics, and system settings.
 
-**Auth**: Requires `admin` role via `has_role()` check.
+**Auth**: Two-step verification:
+1. Extract caller identity via user-scoped Supabase client (`Authorization` header)
+2. Check `user_roles` table for `admin` role using service-role client
+
+**Flow**:
+```
+Request { action, ...params }
+  → Verify JWT (user client)
+  → Check admin role (service-role client)
+  → Route to action handler
+  → Response { success, data }
+```
+
+**Available Actions**:
+
+| Action            | Params                | Purpose                                              |
+|-------------------|-----------------------|------------------------------------------------------|
+| `stats`           | —                     | Returns `totalUsers`, `totalNovels`, `totalChapters` (aggregate counts) |
+| `list-users`      | —                     | All profiles with novel counts and role assignments  |
+| `toggle-user`     | `userId`, `disabled`  | Enable/disable a user account via `profiles.disabled`|
+| `list-all-novels` | —                     | All novels with owner email (FK join with fallback)  |
+| `delete-novel`    | `novelId`             | Cascade delete: chapters → bookmarks → progress → novel |
+| `set-role`        | `userId`, `role`      | Upsert role assignment (`admin`, `moderator`, `user`)|
+| `remove-role`     | `userId`, `role`      | Delete specific role assignment                      |
+| `get-settings`    | —                     | Read all `admin_settings` as key-value map           |
+| `update-setting`  | `key`, `value`        | Upsert setting with `updated_by` audit trail         |
+
+**Delete cascade order** (for `delete-novel`):
+```
+1. DELETE chapters WHERE novel_id = X
+2. DELETE bookmarks WHERE novel_id = X
+3. DELETE reading_progress WHERE novel_id = X
+4. DELETE novels WHERE id = X
+```
+
+**Admin Settings keys** (stored in `admin_settings` table):
+
+| Key                    | Type    | Purpose                                    |
+|------------------------|---------|--------------------------------------------|
+| `adapter_wuxiaclick`   | boolean | Enable/disable WuxiaClick scraping source  |
+| `adapter_novelbin`     | boolean | Enable/disable NovelBin scraping source    |
+| `adapter_empirenovel`  | boolean | Enable/disable EmpireNovel scraping source |
+| *(extensible)*         | jsonb   | Any future admin-configurable setting      |
 
 ### 4.6 Required Secrets
 
