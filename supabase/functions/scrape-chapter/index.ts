@@ -1,4 +1,5 @@
 import { chapterContentCache, Cache } from '../shared/cache.ts';
+import { cleanChapterContent } from '../shared/chapter-cleaner.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
