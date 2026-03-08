@@ -178,9 +178,13 @@ const Reader = () => {
     if (!novel || isFetchingAll) return;
     await fetchAll(novel, (updatedNovel) => {
       setNovel(updatedNovel);
-      syncNovel(updatedNovel); // sync after batch
+    }, (novelId, chapter) => {
+      syncChapterToBackend(novelId, chapter);
     });
-  }, [novel, isFetchingAll, fetchAll]);
+    // Final full sync after batch completes
+    const latest = getNovel(novelIdStr);
+    if (latest) syncNovel(latest);
+  }, [novel, isFetchingAll, fetchAll, novelIdStr]);
 
   const handleSave = useCallback(() => {
     if (novel) {
