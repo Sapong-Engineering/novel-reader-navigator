@@ -9,6 +9,8 @@ import { notify } from '@/lib/notify';
 export interface FetchProgress {
   current: number;
   total: number;
+  totalChapters: number;
+  fetchedChapters: number;
   currentTitle?: string;
   novelId: string;
   novelTitle: string;
@@ -20,7 +22,7 @@ const rateLimiter = new RateLimiter({ requestsPerSecond: 2, maxConcurrent: 3 });
 const batchFetcher = new BatchFetcher<Chapter>({ batchSize: 3 });
 
 let _isFetching = false;
-let _progress: FetchProgress = { current: 0, total: 0, novelId: '', novelTitle: '' };
+let _progress: FetchProgress = { current: 0, total: 0, totalChapters: 0, fetchedChapters: 0, novelId: '', novelTitle: '' };
 let _currentNovel: Novel | null = null;
 const listeners = new Set<Listener>();
 
@@ -58,7 +60,8 @@ export async function startFetchAll(
   }
 
   _isFetching = true;
-  _progress = { current: 0, total: unfetched.length, novelId: novel.id, novelTitle: novel.title };
+  const alreadyFetched = novel.chapters.filter(c => !!c.content).length;
+  _progress = { current: 0, total: unfetched.length, totalChapters: novel.chapters.length, fetchedChapters: alreadyFetched, novelId: novel.id, novelTitle: novel.title };
   _currentNovel = novel;
   batchFetcher.reset();
   emit();
@@ -83,7 +86,7 @@ export async function startFetchAll(
       syncChapterToBackend(novel.id, updated);
     },
     (completed, total) => {
-      _progress = { ..._progress, current: completed, total };
+      _progress = { ..._progress, current: completed, total, fetchedChapters: alreadyFetched + completed };
       emit();
     },
   );
