@@ -1,13 +1,15 @@
+import { useState, useCallback } from 'react';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { Slider } from '@/components/ui/slider';
 import { Separator } from '@/components/ui/separator';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Settings, Sun, Moon, Monitor, Minus, Plus, RefreshCw, Wrench, RotateCcw } from 'lucide-react';
+import { Settings, Sun, Moon, Monitor, Minus, Plus, RefreshCw, Wrench, RotateCcw, Volume2, BellRing } from 'lucide-react';
 import { useThemeContext } from '@/contexts/ThemeContext';
 import { useReaderContext } from '@/contexts/ReaderContext';
 import { useAppSettings } from '@/contexts/AppSettingsContext';
+import { requestNotificationPermission, getNotificationPermission } from '@/lib/notify';
 import { type ReactNode } from 'react';
 
 interface SettingsPanelProps {
