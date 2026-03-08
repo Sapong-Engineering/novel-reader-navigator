@@ -17,6 +17,9 @@ import { useAuth } from '@/hooks/useAuth';
 import { BookOpen, LogOut, LogIn, Loader2, WifiOff, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import SyncIndicator from '@/components/SyncIndicator';
+import SettingsPanel from '@/components/SettingsPanel';
+import { useAppSettings } from '@/contexts/AppSettingsContext';
+import { isSyncEnabled } from '@/lib/notify';
 
 const Index = () => {
   const navigate = useNavigate();
