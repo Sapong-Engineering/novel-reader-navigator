@@ -13,7 +13,7 @@ import {
 } from '@/lib/novel-store';
 import { syncLibraryFromBackend, syncNovel, syncDeleteNovel } from '@/lib/sync-service';
 import { useAuth } from '@/hooks/useAuth';
-import { BookOpen, LogOut, LogIn, Loader2 } from 'lucide-react';
+import { BookOpen, LogOut, LogIn, Loader2, WifiOff } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import SyncIndicator from '@/components/SyncIndicator';
 
@@ -23,6 +23,19 @@ const Index = () => {
   const [isLoadingNovel, setIsLoadingNovel] = useState(false);
   const [library, setLibrary] = useState<Novel[]>(() => getLibrary());
   const [isSyncing, setIsSyncing] = useState(false);
+  const [isOnline, setIsOnline] = useState(navigator.onLine);
+
+  // Track online/offline status
+  useEffect(() => {
+    const onOnline = () => { setIsOnline(true); toast.success('Back online'); };
+    const onOffline = () => { setIsOnline(false); };
+    window.addEventListener('online', onOnline);
+    window.addEventListener('offline', onOffline);
+    return () => {
+      window.removeEventListener('online', onOnline);
+      window.removeEventListener('offline', onOffline);
+    };
+  }, []);
 
   // Sync library from backend when authenticated (guarded against double-fire)
   const syncedRef = useRef(false);
@@ -119,6 +132,16 @@ const Index = () => {
           </Button>
         )}
       </div>
+
+      {/* Offline banner */}
+      {!isOnline && (
+        <div role="status" aria-live="polite" className="mx-4 mb-2 flex items-center gap-2 px-4 py-2.5 rounded-lg bg-destructive/10 border border-destructive/20">
+          <WifiOff className="w-4 h-4 text-destructive flex-shrink-0" aria-hidden="true" />
+          <p className="text-sm font-sans-ui text-foreground">
+            You're offline. Your library is available from local cache. New novels can't be fetched until you reconnect.
+          </p>
+        </div>
+      )}
 
       {/* Hero Section */}
       <div className="flex items-center justify-center px-4 py-12 sm:py-20">
