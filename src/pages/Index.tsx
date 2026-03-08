@@ -166,6 +166,9 @@ const Index = () => {
         )}
       </div>
 
+      {/* Background fetch progress */}
+      <BackgroundFetchBanner />
+
       {/* Offline banner */}
       {!isOnline && (
         <div role="status" aria-live="polite" className="mx-4 mb-2 flex items-center gap-2 px-4 py-2.5 rounded-lg bg-destructive/10 border border-destructive/20">
