@@ -6,6 +6,27 @@ import { setSyncStatus } from '@/hooks/useSyncStatus';
 import { enqueue, dequeue, getQueueLength, onConnectivityChange } from './offline-queue';
 import { compareChapterOrder, orderChapters } from './chapter-order';
 import { isSyncEnabled } from './notify';
+
+// ── Paginated fetch helper (bypasses 1000-row limit) ──
+
+async function fetchAllRows<T>(
+  query: () => ReturnType<ReturnType<typeof supabase.from>['select']>,
+  pageSize = 1000,
+): Promise<T[]> {
+  const all: T[] = [];
+  let from = 0;
+  while (true) {
+    // We need to rebuild the query each time to apply range
+    const { data, error } = await query().range(from, from + pageSize - 1);
+    if (error) throw error;
+    if (!data || data.length === 0) break;
+    all.push(...(data as T[]));
+    if (data.length < pageSize) break;
+    from += pageSize;
+  }
+  return all;
+}
+
 // ── Caches ──
 
 let cachedUserId: string | null = null;
