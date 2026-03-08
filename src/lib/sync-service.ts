@@ -450,6 +450,7 @@ export async function syncBookmarksToBackend(novelLocalId: string): Promise<void
 // ── Single chapter sync ──
 
 export async function syncChapterToBackend(novelLocalId: string, chapter: Chapter): Promise<void> {
+  if (!isSyncEnabled()) return;
   const userId = await getUserId();
   if (!userId) return;
   try {
