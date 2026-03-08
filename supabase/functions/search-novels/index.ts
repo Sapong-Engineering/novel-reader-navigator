@@ -1,6 +1,14 @@
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version',
+};
+
+const ADAPTER_SITE_MAP: Record<string, string> = {
+  adapter_wuxiaclick: 'wuxia.click',
+  adapter_novelbin: 'novelbin.com',
+  adapter_empirenovel: 'empirenovel.com',
 };
 
 Deno.serve(async (req) => {
@@ -26,7 +34,35 @@ Deno.serve(async (req) => {
       );
     }
 
-    const searchQuery = `(site:wuxia.click OR site:novelbin.com OR site:empirenovel.com) ${query.trim()}`;
+    // Read enabled adapters from admin_settings
+    const supabase = createClient(
+      Deno.env.get('SUPABASE_URL')!,
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+    );
+
+    const adapterKeys = Object.keys(ADAPTER_SITE_MAP);
+    const { data: settings } = await supabase
+      .from('admin_settings')
+      .select('key, value')
+      .in('key', adapterKeys);
+
+    const settingsMap: Record<string, boolean> = {};
+    (settings || []).forEach((s: any) => { settingsMap[s.key] = s.value; });
+
+    // Build enabled sites list (default to enabled if no setting exists)
+    const enabledSites = adapterKeys
+      .filter(key => settingsMap[key] ?? true)
+      .map(key => ADAPTER_SITE_MAP[key]);
+
+    if (enabledSites.length === 0) {
+      return new Response(
+        JSON.stringify({ success: true, data: [], message: 'All adapters are disabled' }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    const siteFilter = enabledSites.map(s => `site:${s}`).join(' OR ');
+    const searchQuery = `(${siteFilter}) ${query.trim()}`;
     console.log('Searching novels:', searchQuery);
 
     const response = await fetch('https://api.firecrawl.dev/v1/search', {
@@ -35,10 +71,7 @@ Deno.serve(async (req) => {
         'Authorization': `Bearer ${apiKey}`,
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({
-        query: searchQuery,
-        limit: 20,
-      }),
+      body: JSON.stringify({ query: searchQuery, limit: 20 }),
     });
 
     const data = await response.json();
@@ -51,7 +84,8 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Parse results into novel entries
+    const enabledSitesSet = new Set(enabledSites);
+
     const results = (data.data || [])
       .map((item: any) => {
         const url = item.url || '';
@@ -62,13 +96,15 @@ Deno.serve(async (req) => {
 
         if (source === 'unknown') return null;
 
-        // Exclude obvious non-novel pages
+        // Double-check the source site is enabled
+        const domain = source === 'NovelBin' ? 'novelbin.com' : source === 'WuxiaClick' ? 'wuxia.click' : 'empirenovel.com';
+        if (!enabledSitesSet.has(domain)) return null;
+
         const isChapterPage = /chapter[-_\s]?\d/i.test(url) || /\/chapter\//i.test(url);
         const isUtilityPage = /\/(search|category|tag|login|register|contact|about|faq)\b/i.test(url);
         const isListPage = /\/novels-list/i.test(url) || /[?&]author=/i.test(url) || /[?&]category=/i.test(url);
         if (isChapterPage || isUtilityPage || isListPage) return null;
 
-        // Clean pagination from URLs
         const cleanUrl = url.replace(/\?page=\d+/, '');
 
         return {
@@ -82,7 +118,6 @@ Deno.serve(async (req) => {
       })
       .filter(Boolean);
 
-    // Deduplicate by URL
     const seen = new Set<string>();
     const unique = results.filter((r: any) => {
       if (seen.has(r.url)) return false;
