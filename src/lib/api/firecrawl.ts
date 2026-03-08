@@ -46,3 +46,29 @@ export async function searchNovels(query: string): Promise<SearchResult[]> {
 
   return data.data;
 }
+
+export interface ActiveSource {
+  key: string;
+  label: string;
+  enabled: boolean;
+}
+
+const ADAPTER_MAP: Record<string, string> = {
+  adapter_wuxiaclick: 'WuxiaClick',
+  adapter_novelbin: 'NovelBin',
+  adapter_empirenovel: 'EmpireNovel',
+};
+
+export async function getActiveSources(): Promise<ActiveSource[]> {
+  const keys = Object.keys(ADAPTER_MAP);
+  const { data } = await supabase
+    .from('admin_settings')
+    .select('key, value')
+    .in('key', keys);
+
+  return keys.map((key) => {
+    const row = data?.find((r) => r.key === key);
+    const enabled = row ? row.value === true || row.value === 'true' : true;
+    return { key, label: ADAPTER_MAP[key], enabled };
+  });
+}

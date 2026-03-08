@@ -73,6 +73,25 @@ const NovelSearch = ({ onAddNovel, isAddingNovel }: NovelSearchProps) => {
         </Button>
       </form>
 
+      {activeSources.length > 0 && (
+        <div className="flex items-center gap-2 flex-wrap">
+          <span className="text-[11px] text-muted-foreground font-sans-ui">Sources:</span>
+          {activeSources.map((source) => (
+            <Badge
+              key={source.key}
+              variant="outline"
+              className={`text-[10px] px-1.5 py-0 ${
+                source.enabled
+                  ? sourceColors[source.label] || 'bg-primary/10 text-primary border-primary/20'
+                  : 'bg-muted/50 text-muted-foreground/50 border-border/50 line-through'
+              }`}
+            >
+              {source.label}
+            </Badge>
+          ))}
+        </div>
+      )}
+
       {results.length > 0 && (
         <div className="space-y-2">
           <p className="text-xs text-muted-foreground font-sans-ui">
