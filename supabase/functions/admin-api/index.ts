@@ -182,6 +182,27 @@ Deno.serve(async (req) => {
         break;
       }
 
+      case 'get-settings': {
+        const { data } = await adminClient
+          .from('admin_settings')
+          .select('key, value');
+        const map: Record<string, any> = {};
+        (data || []).forEach((r: any) => { map[r.key] = r.value; });
+        result = map;
+        break;
+      }
+
+      case 'update-setting': {
+        const { key, value } = params;
+        if (!key) throw new Error('key required');
+        const { error } = await adminClient
+          .from('admin_settings')
+          .upsert({ key, value, updated_at: new Date().toISOString(), updated_by: user.id }, { onConflict: 'key' });
+        if (error) throw error;
+        result = { success: true };
+        break;
+      }
+
       default:
         return new Response(JSON.stringify({ error: `Unknown action: ${action}` }), {
           status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },

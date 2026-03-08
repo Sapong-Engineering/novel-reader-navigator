@@ -3,12 +3,13 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
-import { Shield, Users, BookOpen, BarChart3, ArrowLeft } from 'lucide-react';
+import { Shield, Users, BookOpen, BarChart3, ArrowLeft, Settings } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import UserManagement from '@/components/admin/UserManagement';
 import ContentModeration from '@/components/admin/ContentModeration';
 import Analytics from '@/components/admin/Analytics';
+import AdminPreferences from '@/components/admin/AdminPreferences';
 
 const Admin = () => {
   const { user, loading: authLoading } = useAuth();
@@ -73,6 +74,9 @@ const Admin = () => {
             <TabsTrigger value="content" className="gap-1.5">
               <BookOpen className="w-3.5 h-3.5" /> Content
             </TabsTrigger>
+            <TabsTrigger value="preferences" className="gap-1.5">
+              <Settings className="w-3.5 h-3.5" /> Preferences
+            </TabsTrigger>
           </TabsList>
 
           <TabsContent value="analytics">
@@ -83,6 +87,9 @@ const Admin = () => {
           </TabsContent>
           <TabsContent value="content">
             <ContentModeration />
+          </TabsContent>
+          <TabsContent value="preferences">
+            <AdminPreferences />
           </TabsContent>
         </Tabs>
       </div>
