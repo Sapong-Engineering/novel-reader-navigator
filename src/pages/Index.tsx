@@ -149,6 +149,7 @@ const Index = () => {
           </Button>
         )}
         <SyncIndicator />
+        <NotificationCenter />
         <SettingsPanel onSync={user ? handleManualSync : undefined} />
         {authLoading ? null : user ? (
           <>

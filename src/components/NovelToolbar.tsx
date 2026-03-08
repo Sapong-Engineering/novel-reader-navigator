@@ -88,6 +88,7 @@ const NovelToolbar = ({
         )}
 
         <SyncIndicator />
+        <NotificationCenter />
 
         {showReaderSettings && <ReaderSettingsPopover onRepairChapterOrder={onRepairChapterOrder} />}
 
