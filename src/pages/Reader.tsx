@@ -33,8 +33,10 @@ const Reader = () => {
     handleSelectChapter(chapter);
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
+  const orderedChapters = useMemo(() => orderChapters(novel?.chapters ?? []), [novel?.chapters]);
+
   const { hasPrev, hasNext, goToPrev, goToNext } = useChapterNavigation(
-    novel?.chapters ?? [],
+    orderedChapters,
     activeChapter,
     handleNavSelectChapter,
   );
