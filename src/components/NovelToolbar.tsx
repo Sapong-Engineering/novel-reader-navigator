@@ -87,7 +87,13 @@ const NovelToolbar = ({
 
         <SyncIndicator />
 
-        {showReaderSettings && <ReaderSettingsPopover />}
+        {showReaderSettings && <ReaderSettingsPopover onRepairChapterOrder={onRepairChapterOrder} />}
+
+        {onSync && (
+          <Button variant="outline" size="icon" onClick={onSync} className="font-sans-ui" aria-label="Sync">
+            <RefreshCw className="w-4 h-4" />
+          </Button>
+        )}
 
         <Button variant="outline" size="sm" onClick={onSave} className="font-sans-ui hidden sm:inline-flex">
           <Save className="w-4 h-4 mr-2" />

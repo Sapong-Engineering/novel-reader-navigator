@@ -93,6 +93,21 @@ export function ReaderSettingsPopover({ onRepairChapterOrder }: ReaderSettingsPo
           <RotateCcw className="w-3 h-3 mr-1.5" />
           Reset defaults
         </Button>
+
+        {onRepairChapterOrder && (
+          <>
+            <Separator />
+            <Button
+              variant="ghost"
+              size="sm"
+              className="w-full h-7 text-xs text-muted-foreground font-sans-ui"
+              onClick={onRepairChapterOrder}
+            >
+              <ListOrdered className="w-3 h-3 mr-1.5" />
+              Repair chapter order
+            </Button>
+          </>
+        )}
       </PopoverContent>
     </Popover>
   );

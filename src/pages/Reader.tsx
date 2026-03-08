@@ -260,6 +260,8 @@ const Reader = () => {
         onFetchAll={handleFetchAll}
         isFetchingAll={isFetchingAll}
         fetchProgress={fetchProgress}
+        onSync={handleManualSync}
+        onRepairChapterOrder={handleRepairChapterOrder}
         showReaderSettings
         mobileChapterDrawer={
           <MobileChapterDrawer
