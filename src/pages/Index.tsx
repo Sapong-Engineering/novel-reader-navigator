@@ -19,6 +19,7 @@ import { Button } from '@/components/ui/button';
 import SyncIndicator from '@/components/SyncIndicator';
 import SettingsPanel from '@/components/SettingsPanel';
 import NotificationCenter from '@/components/NotificationCenter';
+import BackgroundFetchBanner from '@/components/BackgroundFetchBanner';
 import { useAppSettings } from '@/contexts/AppSettingsContext';
 import { isSyncEnabled } from '@/lib/notify';
 
