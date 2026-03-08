@@ -442,6 +442,29 @@ export async function syncBookmarksToBackend(novelLocalId: string): Promise<void
   }
 }
 
+// ── Single chapter sync ──
+
+export async function syncChapterToBackend(novelLocalId: string, chapter: Chapter): Promise<void> {
+  const userId = await getUserId();
+  if (!userId) return;
+  try {
+    const novelUuid = await resolveNovelUuid(novelLocalId, userId);
+    if (!novelUuid) return;
+
+    await supabase.from('chapters').upsert({
+      novel_id: novelUuid,
+      user_id: userId,
+      local_id: chapter.id,
+      title: chapter.title,
+      url: chapter.url,
+      content: chapter.content ?? null,
+      saved_at: chapter.savedAt ?? null,
+    }, { onConflict: 'novel_id,local_id' });
+  } catch (err) {
+    console.error('[sync] Failed to sync single chapter:', err);
+  }
+}
+
 // ── Offline queue replay ──
 
 let isReplaying = false;

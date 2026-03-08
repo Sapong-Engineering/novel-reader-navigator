@@ -79,6 +79,7 @@ export function useChapterFetcher(): UseChapterFetcherResult {
           };
           saveNovel(currentNovel);
           onUpdate(currentNovel);
+          onChapterFetched?.(novel.id, updated);
         },
         (completed, total) => {
           setProgress(prev => ({ ...prev, current: completed, total }));
