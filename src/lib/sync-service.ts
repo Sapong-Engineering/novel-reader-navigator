@@ -301,6 +301,11 @@ async function upsertNovelToBackend(novel: Novel, userId: string): Promise<void>
 }
 
 export async function syncNovel(novel: Novel): Promise<void> {
+  if (!navigator.onLine) {
+    enqueue('syncNovel', { novelId: novel.id });
+    setSyncStatus('idle');
+    return;
+  }
   const userId = await getUserId();
   if (!userId) return;
   setSyncStatus('syncing');
@@ -309,6 +314,7 @@ export async function syncNovel(novel: Novel): Promise<void> {
     setSyncStatus('done');
   } catch (err) {
     setSyncStatus('error');
+    enqueue('syncNovel', { novelId: novel.id });
     console.error('Failed to sync novel to backend:', err);
   }
 }
