@@ -1,5 +1,6 @@
 import { ReactNode } from 'react';
 import { Button } from '@/components/ui/button';
+import SyncIndicator from '@/components/SyncIndicator';
 import { Download, FileText, Save, BookOpen, Loader2, CloudDownload } from 'lucide-react';
 import {
   DropdownMenu,
