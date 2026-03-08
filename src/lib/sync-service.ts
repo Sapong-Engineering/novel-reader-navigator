@@ -6,6 +6,27 @@ import { setSyncStatus } from '@/hooks/useSyncStatus';
 import { enqueue, dequeue, getQueueLength, onConnectivityChange } from './offline-queue';
 import { compareChapterOrder, orderChapters } from './chapter-order';
 import { isSyncEnabled } from './notify';
+
+// ── Paginated fetch helper (bypasses 1000-row limit) ──
+
+async function fetchAllRows<T>(
+  query: () => ReturnType<ReturnType<typeof supabase.from>['select']>,
+  pageSize = 1000,
+): Promise<T[]> {
+  const all: T[] = [];
+  let from = 0;
+  while (true) {
+    // We need to rebuild the query each time to apply range
+    const { data, error } = await query().range(from, from + pageSize - 1);
+    if (error) throw error;
+    if (!data || data.length === 0) break;
+    all.push(...(data as T[]));
+    if (data.length < pageSize) break;
+    from += pageSize;
+  }
+  return all;
+}
+
 // ── Caches ──
 
 let cachedUserId: string | null = null;
@@ -161,15 +182,11 @@ export async function syncLibraryFromBackend(): Promise<Novel[]> {
 
   try {
     // Fetch novels and chapter METADATA only (skip content for speed)
-    const [novelsRes, chaptersRes] = await Promise.all([
-      supabase.from('novels').select('*'),
-      supabase.from('chapters').select('id,novel_id,local_id,title,url,saved_at,sort_order'),
+    // Use paginated fetch to bypass the 1000-row default limit
+    const [remoteNovels, remoteChapters] = await Promise.all([
+      fetchAllRows<any>(() => supabase.from('novels').select('*')),
+      fetchAllRows<any>(() => supabase.from('chapters').select('id,novel_id,local_id,title,url,saved_at,sort_order')),
     ]);
-
-    if (novelsRes.error) throw novelsRes.error;
-
-    const remoteNovels = novelsRes.data ?? [];
-    const remoteChapters = chaptersRes.data ?? [];
 
     // Populate UUID cache
     for (const rn of remoteNovels) {
@@ -481,15 +498,14 @@ export async function syncFullNovelFromBackend(novelLocalId: string): Promise<No
     const novelUuid = await resolveNovelUuid(novelLocalId, userId);
     if (!novelUuid) return null;
 
-    const [novelRes, chaptersRes] = await Promise.all([
+    const [novelRes, remoteChapters] = await Promise.all([
       supabase.from('novels').select('*').eq('id', novelUuid).single(),
-      supabase.from('chapters').select('*').eq('novel_id', novelUuid).order('sort_order'),
+      fetchAllRows<any>(() => supabase.from('chapters').select('*').eq('novel_id', novelUuid).order('sort_order')),
     ]);
 
     if (novelRes.error || !novelRes.data) return null;
 
     const rn = novelRes.data;
-    const remoteChapters = chaptersRes.data ?? [];
 
     const localNovel = getNovel(novelLocalId);
 
