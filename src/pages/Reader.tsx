@@ -28,6 +28,7 @@ const Reader = () => {
   const forceScrollTopRef = useRef(false);
 
   const { isFetching: isFetchingAll, progress: fetchProgress, fetchAll } = useChapterFetcher();
+  const appSettings = useAppSettings();
 
   const handleNavSelectChapter = useCallback((chapter: Chapter) => {
     forceScrollTopRef.current = true;
