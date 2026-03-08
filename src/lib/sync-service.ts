@@ -2,6 +2,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { type Novel, type Chapter, getLibrary, saveNovel, deleteNovel as deleteLocalNovel } from './novel-store';
 import { getBookmarks, type Bookmark } from './bookmarks';
 import { getReadingProgress, saveReadingProgress, getLastReadChapter, saveLastReadChapter } from './storage-manager';
+import { setSyncStatus } from '@/hooks/useSyncStatus';
 
 // ── Caches ──
 
@@ -152,6 +153,7 @@ async function getOrCreateNovelId(localId: string, userId: string, novel: Novel)
 export async function syncLibraryFromBackend(): Promise<Novel[]> {
   const userId = await getUserId();
   if (!userId) return getLibrary();
+  setSyncStatus('syncing');
 
   try {
     // Fetch novels and chapter METADATA only (skip content for speed)
@@ -239,8 +241,10 @@ export async function syncLibraryFromBackend(): Promise<Novel[]> {
       }
     }
 
+    setSyncStatus('done');
     return Array.from(urlMap.values());
   } catch (err) {
+    setSyncStatus('error');
     console.error('Sync failed, using local data:', err);
     return getLibrary();
   }
@@ -297,9 +301,12 @@ async function upsertNovelToBackend(novel: Novel, userId: string): Promise<void>
 export async function syncNovel(novel: Novel): Promise<void> {
   const userId = await getUserId();
   if (!userId) return;
+  setSyncStatus('syncing');
   try {
     await upsertNovelToBackend(novel, userId);
+    setSyncStatus('done');
   } catch (err) {
+    setSyncStatus('error');
     console.error('Failed to sync novel to backend:', err);
   }
 }
@@ -307,6 +314,7 @@ export async function syncNovel(novel: Novel): Promise<void> {
 export async function syncDeleteNovel(localId: string): Promise<void> {
   const userId = await getUserId();
   if (!userId) return;
+  setSyncStatus('syncing');
   try {
     novelUuidCache.delete(localId);
     await supabase
@@ -314,7 +322,9 @@ export async function syncDeleteNovel(localId: string): Promise<void> {
       .delete()
       .eq('local_id', localId)
       .eq('user_id', userId);
+    setSyncStatus('done');
   } catch (err) {
+    setSyncStatus('error');
     console.error('Failed to delete novel from backend:', err);
   }
 }
@@ -350,6 +360,7 @@ export async function fetchChapterContentFromBackend(
 export async function syncBookmarksToBackend(novelLocalId: string): Promise<void> {
   const userId = await getUserId();
   if (!userId) return;
+  setSyncStatus('syncing');
   try {
     const novelUuid = await resolveNovelUuid(novelLocalId, userId);
     if (!novelUuid) return;
@@ -374,7 +385,9 @@ export async function syncBookmarksToBackend(novelLocalId: string): Promise<void
           label: b.label ?? null,
         })));
     }
+    setSyncStatus('done');
   } catch (err) {
+    setSyncStatus('error');
     console.error('Failed to sync bookmarks:', err);
   }
 }

@@ -15,6 +15,7 @@ import { syncLibraryFromBackend, syncNovel, syncDeleteNovel } from '@/lib/sync-s
 import { useAuth } from '@/hooks/useAuth';
 import { BookOpen, LogOut, LogIn, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import SyncIndicator from '@/components/SyncIndicator';
 
 const Index = () => {
   const navigate = useNavigate();
@@ -104,6 +105,7 @@ const Index = () => {
     <div className="min-h-screen bg-background">
       {/* Top bar */}
       <div className="flex items-center justify-end px-4 py-3 gap-2">
+        <SyncIndicator />
         {authLoading ? null : user ? (
           <>
             <span className="text-xs text-muted-foreground truncate max-w-[200px]">{user.email}</span>
