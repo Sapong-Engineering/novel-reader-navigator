@@ -194,6 +194,27 @@ const Reader = () => {
     }
   }, [novel]);
 
+  const handleManualSync = useCallback(async () => {
+    if (!novel) return;
+    toast.info('Syncing...');
+    try {
+      await syncNovel(novel);
+      toast.success('Sync complete!');
+    } catch {
+      toast.error('Sync failed');
+    }
+  }, [novel]);
+
+  const handleRepairChapterOrder = useCallback(() => {
+    if (!novel) return;
+    const sorted = orderChapters(novel.chapters);
+    const repairedNovel: Novel = { ...novel, chapters: sorted };
+    saveNovel(repairedNovel);
+    setNovel(repairedNovel);
+    syncNovel(repairedNovel);
+    toast.success('Chapter order repaired');
+  }, [novel]);
+
   const handleExportPdf = useCallback(async () => {
     if (!novel) return;
     const saved = novel.chapters.filter(c => c.content);
