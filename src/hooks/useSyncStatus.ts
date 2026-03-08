@@ -1,6 +1,6 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect } from 'react';
 
-type SyncState = 'idle' | 'syncing' | 'done' | 'error';
+export type SyncState = 'idle' | 'syncing' | 'done' | 'error';
 
 let listeners: Set<(state: SyncState) => void> = new Set();
 let currentState: SyncState = 'idle';
@@ -19,6 +19,11 @@ function notify(state: SyncState) {
 /** Call from sync-service to broadcast status changes */
 export function setSyncStatus(state: SyncState) {
   notify(state);
+}
+
+/** Dismiss error state back to idle */
+export function dismissSyncError() {
+  if (currentState === 'error') notify('idle');
 }
 
 /** React hook to consume sync status */
