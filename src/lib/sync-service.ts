@@ -360,6 +360,7 @@ export async function fetchChapterContentFromBackend(
 export async function syncBookmarksToBackend(novelLocalId: string): Promise<void> {
   const userId = await getUserId();
   if (!userId) return;
+  setSyncStatus('syncing');
   try {
     const novelUuid = await resolveNovelUuid(novelLocalId, userId);
     if (!novelUuid) return;
@@ -384,7 +385,9 @@ export async function syncBookmarksToBackend(novelLocalId: string): Promise<void
           label: b.label ?? null,
         })));
     }
+    setSyncStatus('done');
   } catch (err) {
+    setSyncStatus('error');
     console.error('Failed to sync bookmarks:', err);
   }
 }
