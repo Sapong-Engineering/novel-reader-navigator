@@ -87,7 +87,11 @@ const Index = () => {
         savedAt: new Date().toISOString(),
       };
       saveNovel(newNovel);
-      syncNovel(newNovel);
+      // Save to cloud in parallel — wait for both before navigating
+      await Promise.all([
+        Promise.resolve(), // local save already done synchronously
+        syncNovel(newNovel),
+      ]);
       setLibrary(getLibrary());
       navigate(`/reader/${newNovel.id}`);
       toast.success(`Loaded "${info.title}" with ${info.chapters.length} chapters!`);

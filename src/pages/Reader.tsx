@@ -7,7 +7,7 @@ import NovelToolbar from '@/components/NovelToolbar';
 import MobileChapterDrawer from '@/components/MobileChapterDrawer';
 import ErrorBoundary from '@/components/ErrorBoundary';
 import { type Novel, type Chapter, saveNovel, getNovel } from '@/lib/novel-store';
-import { syncNovel, syncBookmarksToBackend, syncProgressToBackend, fetchChapterContentFromBackend, syncChapterToBackend } from '@/lib/sync-service';
+import { syncNovel, syncBookmarksToBackend, syncProgressToBackend, fetchChapterContentFromBackend, syncChapterToBackend, syncFullNovelFromBackend } from '@/lib/sync-service';
 import { exportToPdfWithProgress, exportToDocxWithProgress } from '@/lib/export-service';
 import { useChapterNavigation } from '@/hooks/useChapterNavigation';
 import { useChapterFetcher } from '@/hooks/useChapterFetcher';
@@ -56,20 +56,43 @@ const Reader = () => {
   } = useBookmarks(novelIdStr);
 
   useEffect(() => {
-    if (novelId) {
-      const stored = getNovel(novelId);
-      if (stored) {
-        setNovel(stored);
-        const lastReadId = getLastRead();
-        if (lastReadId) {
-          const lastChapter = stored.chapters.find(c => c.id === lastReadId);
-          if (lastChapter) setActiveChapter(lastChapter);
-        }
-      } else {
-        toast.error('Novel not found in library. Please go back and try again.');
-        navigate('/');
+    if (!novelId) return;
+
+    const stored = getNovel(novelId);
+    if (stored) {
+      setNovel(stored);
+      const lastReadId = getLastRead();
+      if (lastReadId) {
+        const lastChapter = stored.chapters.find(c => c.id === lastReadId);
+        if (lastChapter) setActiveChapter(lastChapter);
       }
+    } else {
+      toast.error('Novel not found in library. Please go back and try again.');
+      navigate('/');
+      return;
     }
+
+    // Sync from backend to pick up new chapters (cron-discovered or from other devices)
+    syncFullNovelFromBackend(novelId).then(synced => {
+      if (synced) {
+        setNovel(prev => {
+          if (!prev) return synced;
+          // Merge: keep local content, add new remote chapters
+          const localById = new Map(prev.chapters.map(c => [c.id, c]));
+          const merged = synced.chapters.map(sc => {
+            const local = localById.get(sc.id);
+            return local ? { ...sc, content: local.content ?? sc.content } : sc;
+          });
+          const remoteIds = new Set(synced.chapters.map(c => c.id));
+          for (const lc of prev.chapters) {
+            if (!remoteIds.has(lc.id)) merged.push(lc);
+          }
+          const updated = { ...synced, chapters: merged };
+          saveNovel(updated);
+          return updated;
+        });
+      }
+    });
   }, [novelId, navigate]); // eslint-disable-line react-hooks/exhaustive-deps
 
   async function handleSelectChapter(chapter: Chapter) {
