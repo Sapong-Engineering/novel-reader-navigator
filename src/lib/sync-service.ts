@@ -320,6 +320,11 @@ export async function syncNovel(novel: Novel): Promise<void> {
 }
 
 export async function syncDeleteNovel(localId: string): Promise<void> {
+  if (!navigator.onLine) {
+    enqueue('deleteNovel', { localId });
+    setSyncStatus('idle');
+    return;
+  }
   const userId = await getUserId();
   if (!userId) return;
   setSyncStatus('syncing');
@@ -333,8 +338,10 @@ export async function syncDeleteNovel(localId: string): Promise<void> {
     setSyncStatus('done');
   } catch (err) {
     setSyncStatus('error');
+    enqueue('deleteNovel', { localId });
     console.error('Failed to delete novel from backend:', err);
   }
+}
 }
 
 // ── On-demand chapter content from backend ──
