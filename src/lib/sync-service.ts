@@ -198,8 +198,16 @@ export async function syncLibraryFromBackend(): Promise<Novel[]> {
     for (const rn of remoteNovels) {
       seenLocalIds.add(rn.local_id);
       const rawChapters = chaptersByNovelId.get(rn.id) ?? [];
-      // Sort by sort_order from backend to restore original scrape order
-      rawChapters.sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0));
+      // Primary order from backend sort_order, with natural chapter-order tie-breaks
+      rawChapters.sort((a, b) => {
+        const sortDiff = (a.sort_order ?? 0) - (b.sort_order ?? 0);
+        if (sortDiff !== 0) return sortDiff;
+        return compareChapterOrder(
+          { id: a.local_id, title: a.title, url: a.url },
+          { id: b.local_id, title: b.title, url: b.url },
+        );
+      });
+
       const chapters = rawChapters.map(c => ({
         id: c.local_id,
         title: c.title,
