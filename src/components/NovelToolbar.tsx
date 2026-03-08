@@ -81,6 +81,8 @@ const NovelToolbar = ({
           </Button>
         )}
 
+        <SyncIndicator />
+
         {showReaderSettings && <ReaderSettingsPopover />}
 
         <Button variant="outline" size="sm" onClick={onSave} className="font-sans-ui hidden sm:inline-flex">

@@ -105,6 +105,7 @@ const Index = () => {
     <div className="min-h-screen bg-background">
       {/* Top bar */}
       <div className="flex items-center justify-end px-4 py-3 gap-2">
+        <SyncIndicator />
         {authLoading ? null : user ? (
           <>
             <span className="text-xs text-muted-foreground truncate max-w-[200px]">{user.email}</span>
