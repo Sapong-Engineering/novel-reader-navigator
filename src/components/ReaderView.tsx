@@ -1,12 +1,13 @@
 import { useRef, useEffect, useState, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { ChevronLeft, ChevronRight, Loader2, Bookmark, BookmarkCheck, ArrowUp, ArrowDown } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Loader2, Bookmark, BookmarkCheck, ArrowUp, ArrowDown, BookOpen } from 'lucide-react';
 import type { Chapter } from '@/lib/novel-store';
 import type { Bookmark as BookmarkType } from '@/lib/bookmarks';
 
 interface ReaderViewProps {
   chapter: Chapter | null;
+  novelTitle?: string;
   isLoading?: boolean;
   onPrevChapter?: () => void;
   onNextChapter?: () => void;
@@ -21,6 +22,7 @@ interface ReaderViewProps {
 
 const ReaderView = ({
   chapter,
+  novelTitle,
   isLoading,
   onPrevChapter,
   onNextChapter,
@@ -86,8 +88,12 @@ const ReaderView = ({
     return (
       <div className="flex items-center justify-center h-full bg-reader">
         <div className="text-center animate-fade-in">
-          <Loader2 className="w-8 h-8 animate-spin text-primary mx-auto mb-3" />
-          <p className="text-muted-foreground font-sans-ui">Loading chapter...</p>
+          <div className="reader-loading-icon">
+            <BookOpen className="w-10 h-10 text-primary mx-auto" />
+          </div>
+          <p className="text-muted-foreground font-sans-ui mt-4 text-sm tracking-wide uppercase">
+            Loading chapter…
+          </p>
         </div>
       </div>
     );
@@ -97,6 +103,7 @@ const ReaderView = ({
     return (
       <div className="flex items-center justify-center h-full bg-reader">
         <div className="text-center animate-fade-in px-4">
+          <BookOpen className="w-12 h-12 text-muted-foreground/40 mx-auto mb-4" />
           <p className="text-muted-foreground font-sans-ui text-base sm:text-lg">
             Select a chapter to start reading
           </p>
@@ -119,47 +126,68 @@ const ReaderView = ({
   return (
     <div className="flex flex-col h-full bg-reader relative">
       {/* Reading progress bar */}
-      <div className="h-1 w-full bg-muted shrink-0">
+      <div className="h-0.5 w-full bg-muted/50 shrink-0 overflow-hidden">
         <div
-          className="h-full bg-primary transition-all duration-150 ease-out"
+          className="h-full reader-progress-bar transition-all duration-200 ease-out"
           style={{ width: `${scrollProgress}%` }}
         />
       </div>
+
       <div
         ref={scrollRef}
         className="flex-1 overflow-y-auto scrollbar-thin"
       >
-        <div className="max-w-2xl mx-auto px-4 sm:px-8 py-6 sm:py-12 animate-fade-in">
-          <h2 className="font-sans-ui text-xl sm:text-2xl font-bold mb-6 sm:mb-8 text-foreground">
-            {chapter.title}
-          </h2>
+        <div className="max-w-2xl mx-auto px-5 sm:px-10 py-8 sm:py-14 animate-fade-in">
+          {/* Chapter header */}
+          <header className="mb-8 sm:mb-12">
+            {novelTitle && (
+              <p className="font-sans-ui text-xs sm:text-sm text-muted-foreground tracking-widest uppercase mb-2">
+                {novelTitle}
+              </p>
+            )}
+            <h2 className="font-sans-ui text-2xl sm:text-3xl font-bold text-foreground leading-tight tracking-tight">
+              {chapter.title}
+            </h2>
+            <div className="reader-ornament mt-5 sm:mt-6" />
+          </header>
+
+          {/* Chapter content */}
           {chapter.content ? (
             <div
-              className="font-serif-reader text-reader leading-[1.8] sm:leading-[1.9] space-y-4"
+              className="reader-prose font-serif-reader text-reader leading-[1.85] sm:leading-[2] space-y-5"
               style={{
-                fontSize: 'var(--reader-font-size, 16px)',
+                fontSize: 'var(--reader-font-size, 17px)',
                 fontFamily: 'var(--reader-font-family, serif)',
               }}
             >
-              {chapter.content.split('\n\n').map((para, i) => (
-                para.trim() && <p key={i}>{para.trim()}</p>
-              ))}
+              {chapter.content.split('\n\n').map((para, i) =>
+                para.trim() && (
+                  <p key={i} className={i === 0 ? 'reader-first-paragraph' : ''}>
+                    {para.trim()}
+                  </p>
+                )
+              )}
             </div>
           ) : (
-            <p className="text-muted-foreground font-sans-ui italic">
+            <p className="text-muted-foreground font-sans-ui italic text-center py-12">
               Chapter content not yet fetched.
             </p>
+          )}
+
+          {/* End-of-chapter ornament */}
+          {chapter.content && (
+            <div className="reader-ornament mt-10 sm:mt-14 mb-4" />
           )}
         </div>
       </div>
 
       {/* Floating scroll buttons */}
-      <div className="absolute right-4 bottom-20 flex flex-col gap-2 z-10">
+      <div className="absolute right-4 bottom-24 flex flex-col gap-2 z-10">
         {showScrollTop && (
           <Button
             variant="secondary"
             size="icon"
-            className="h-9 w-9 rounded-full shadow-md"
+            className="h-9 w-9 rounded-full reader-float-btn animate-fade-in"
             onClick={handleScrollToTop}
             title="Back to top"
           >
@@ -170,7 +198,7 @@ const ReaderView = ({
           <Button
             variant="secondary"
             size="icon"
-            className="h-9 w-9 rounded-full shadow-md"
+            className="h-9 w-9 rounded-full reader-float-btn animate-fade-in"
             onClick={handleScrollToBottom}
             title="Go to bottom"
           >
@@ -181,7 +209,7 @@ const ReaderView = ({
 
       {/* Inline bookmark label input */}
       {showLabelInput && (
-        <div className="border-t border-border px-3 sm:px-6 py-2 flex items-center gap-2 bg-card/70">
+        <div className="border-t border-border px-3 sm:px-6 py-2 flex items-center gap-2 bg-card/70 backdrop-blur-sm">
           <Input
             value={labelDraft}
             onChange={e => setLabelDraft(e.target.value)}
@@ -202,14 +230,21 @@ const ReaderView = ({
         </div>
       )}
 
-      <div className="border-t border-border px-3 sm:px-6 py-3 flex items-center justify-between bg-card/50">
-        <Button variant="ghost" size="sm" onClick={onPrevChapter} disabled={!hasPrev} className="font-sans-ui">
+      {/* Bottom navigation */}
+      <div className="reader-nav-bar px-3 sm:px-6 py-3.5 flex items-center justify-between">
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={onPrevChapter}
+          disabled={!hasPrev}
+          className="font-sans-ui rounded-full px-4 border-border/60 hover:bg-accent/10"
+        >
           <ChevronLeft className="w-4 h-4 mr-1" />
           <span className="hidden sm:inline">Previous</span>
           <span className="sm:hidden">Prev</span>
         </Button>
 
-        <div className="flex items-center gap-1.5">
+        <div className="flex items-center gap-1.5 min-w-0">
           {onAddBookmark && (
             <Button
               variant="ghost"
@@ -230,8 +265,15 @@ const ReaderView = ({
           </span>
         </div>
 
-        <Button variant="ghost" size="sm" onClick={onNextChapter} disabled={!hasNext} className="font-sans-ui">
-          Next
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={onNextChapter}
+          disabled={!hasNext}
+          className="font-sans-ui rounded-full px-4 border-border/60 hover:bg-accent/10"
+        >
+          <span className="hidden sm:inline">Next</span>
+          <span className="sm:hidden">Next</span>
           <ChevronRight className="w-4 h-4 ml-1" />
         </Button>
       </div>
