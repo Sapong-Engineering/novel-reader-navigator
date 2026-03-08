@@ -306,8 +306,7 @@ async function upsertNovelToBackend(novel: Novel, userId: string): Promise<void>
     })
     .eq('id', novelUuid);
 
-  // Batch upsert ALL chapters (metadata for all, content for those that have it)
-  // sort_order uses chapter order so it stays stable across sessions/devices.
+  // Batch upsert ALL chapters in chunks of 500 to avoid hitting Supabase limits
   const orderedChapters = orderChapters(novel.chapters);
   const allChaptersData = orderedChapters.map((ch, index) => ({
     novel_id: novelUuid,
@@ -320,11 +319,15 @@ async function upsertNovelToBackend(novel: Novel, userId: string): Promise<void>
     sort_order: index,
   }));
 
-  const chaptersPromise = allChaptersData.length > 0
-    ? supabase.from('chapters').upsert(allChaptersData, { onConflict: 'novel_id,local_id' })
-    : Promise.resolve(null);
+  await metaPromise;
 
-  await Promise.all([metaPromise, chaptersPromise]);
+  // Chunk upserts to avoid row limits
+  const CHUNK_SIZE = 500;
+  for (let i = 0; i < allChaptersData.length; i += CHUNK_SIZE) {
+    const chunk = allChaptersData.slice(i, i + CHUNK_SIZE);
+    const { error } = await supabase.from('chapters').upsert(chunk, { onConflict: 'novel_id,local_id' });
+    if (error) console.error(`[sync] Chapter chunk upsert failed (offset ${i}):`, error);
+  }
 }
 
 export async function syncNovel(novel: Novel): Promise<void> {
