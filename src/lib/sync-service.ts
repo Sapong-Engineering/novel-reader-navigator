@@ -333,6 +333,7 @@ async function upsertNovelToBackend(novel: Novel, userId: string): Promise<void>
 }
 
 export async function syncNovel(novel: Novel): Promise<void> {
+  if (!isSyncEnabled()) return;
   if (!navigator.onLine) {
     enqueue('syncNovel', { novelId: novel.id });
     setSyncStatus('idle');
