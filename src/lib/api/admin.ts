@@ -44,4 +44,6 @@ export const adminApi = {
   deleteNovel: (novelId: string) => adminCall('delete-novel', { novelId }),
   setRole: (userId: string, role: string) => adminCall('set-role', { userId, role }),
   removeRole: (userId: string, role: string) => adminCall('remove-role', { userId, role }),
+  getSettings: (): Promise<Record<string, any>> => adminCall('get-settings'),
+  updateSetting: (key: string, value: any) => adminCall('update-setting', { key, value }),
 };

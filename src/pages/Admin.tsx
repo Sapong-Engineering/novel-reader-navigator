@@ -88,6 +88,9 @@ const Admin = () => {
           <TabsContent value="content">
             <ContentModeration />
           </TabsContent>
+          <TabsContent value="preferences">
+            <AdminPreferences />
+          </TabsContent>
         </Tabs>
       </div>
     </div>
