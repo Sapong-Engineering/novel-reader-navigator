@@ -22,7 +22,11 @@ import SyncIndicator from '@/components/SyncIndicator';
 import SettingsPanel from '@/components/SettingsPanel';
 import NotificationCenter from '@/components/NotificationCenter';
 import BackgroundFetchBanner from '@/components/BackgroundFetchBanner';
+import ReadingStats from '@/components/ReadingStats';
+import ReadingListManager from '@/components/ReadingListManager';
+import AddToListMenu from '@/components/AddToListMenu';
 import { useAppSettings } from '@/contexts/AppSettingsContext';
+import { useReadingLists } from '@/hooks/useReadingLists';
 import { isSyncEnabled } from '@/lib/notify';
 
 const Index = () => {
@@ -32,8 +36,10 @@ const Index = () => {
   const [library, setLibrary] = useState<Novel[]>(() => getLibrary());
   const [isSyncing, setIsSyncing] = useState(false);
   const [isOnline, setIsOnline] = useState(navigator.onLine);
+  const [activeListFilter, setActiveListFilter] = useState<string | null>(null);
   const appSettings = useAppSettings();
   const [isAdmin, setIsAdmin] = useState(false);
+  const readingLists = useReadingLists();
 
   // Check admin role
   useEffect(() => {
@@ -56,7 +62,7 @@ const Index = () => {
     };
   }, []);
 
-  // Sync library from backend when authenticated (guarded against double-fire)
+  // Sync library from backend when authenticated
   const syncedRef = useRef(false);
   useEffect(() => {
     if (user && !authLoading && !syncedRef.current && appSettings.syncEnabled) {
@@ -71,7 +77,6 @@ const Index = () => {
   }, [user, authLoading, appSettings.syncEnabled]);
 
   const handleFetchNovel = useCallback(async (url: string) => {
-    // Check if novel with same URL already exists
     const existing = library.find(n => n.url === url);
     if (existing) {
       navigate(`/reader/${existing.id}`);
@@ -82,8 +87,6 @@ const Index = () => {
     setIsLoadingNovel(true);
     try {
       const info = await scrapeNovelInfo(url);
-
-      // Check again after fetch (by URL or title)
       const existingAfterFetch = library.find(n => n.url === url);
       if (existingAfterFetch) {
         navigate(`/reader/${existingAfterFetch.id}`);
@@ -105,9 +108,8 @@ const Index = () => {
         savedAt: new Date().toISOString(),
       };
       saveNovel(newNovel);
-      // Save to cloud in parallel — wait for both before navigating
       await Promise.all([
-        Promise.resolve(), // local save already done synchronously
+        Promise.resolve(),
         syncNovel(newNovel),
       ]);
       setLibrary(getLibrary());
@@ -127,7 +129,7 @@ const Index = () => {
 
   const handleDeleteNovel = useCallback((id: string) => {
     deleteNovel(id);
-    syncDeleteNovel(id); // fire-and-forget
+    syncDeleteNovel(id);
     setLibrary(getLibrary());
     toast.success('Novel removed from library');
   }, []);
@@ -152,6 +154,19 @@ const Index = () => {
     }
   }, [user]);
 
+  const handleToggleList = useCallback((listId: string, novelId: string, checked: boolean) => {
+    if (checked) {
+      readingLists.addToList(listId, novelId);
+    } else {
+      readingLists.removeFromList(listId, novelId);
+    }
+  }, [readingLists]);
+
+  // Filter library by active list
+  const filteredLibrary = activeListFilter
+    ? library.filter(n => readingLists.getListNovelIds(activeListFilter).includes(n.id))
+    : library;
+
   return (
     <div id="main-content" className="min-h-screen bg-background">
       {/* Top bar */}
@@ -163,6 +178,15 @@ const Index = () => {
         )}
         <SyncIndicator />
         <NotificationCenter />
+        <ReadingStats />
+        {user && (
+          <ReadingListManager
+            lists={readingLists.lists}
+            onCreate={readingLists.createList}
+            onRename={readingLists.renameList}
+            onDelete={readingLists.deleteList}
+          />
+        )}
         <SettingsPanel onSync={user ? handleManualSync : undefined} />
         {authLoading ? null : user ? (
           <>
@@ -196,7 +220,7 @@ const Index = () => {
         </div>
       )}
 
-      {/* Hero Section — Paste URL or Search */}
+      {/* Hero Section */}
       <div className="flex items-center justify-center px-4 py-12 sm:py-20">
         <div className="w-full max-w-2xl">
           <Tabs defaultValue="url" className="w-full">
@@ -220,7 +244,7 @@ const Index = () => {
 
       {/* Library Section */}
       <div className="max-w-6xl mx-auto px-4 pb-12">
-        <div className="flex items-center gap-2 mb-6">
+        <div className="flex items-center gap-2 mb-4">
           <BookOpen className="w-5 h-5 text-primary" />
           <h2 className="font-sans-ui font-semibold text-lg text-foreground">Your Library</h2>
           {library.length > 0 && (
@@ -231,21 +255,49 @@ const Index = () => {
           {isSyncing && <Loader2 className="w-4 h-4 animate-spin text-muted-foreground ml-2" />}
         </div>
 
-        {library.length === 0 ? (
+        {/* Reading list filter tabs */}
+        {user && readingLists.lists.length > 0 && (
+          <div className="flex items-center gap-1.5 mb-4 overflow-x-auto scrollbar-thin pb-1">
+            <Button
+              variant={activeListFilter === null ? 'default' : 'outline'}
+              size="sm"
+              className="font-sans-ui text-xs rounded-full px-3 h-7 whitespace-nowrap"
+              onClick={() => setActiveListFilter(null)}
+            >
+              All
+            </Button>
+            {readingLists.lists.map(list => (
+              <Button
+                key={list.id}
+                variant={activeListFilter === list.id ? 'default' : 'outline'}
+                size="sm"
+                className="font-sans-ui text-xs rounded-full px-3 h-7 whitespace-nowrap"
+                onClick={() => setActiveListFilter(activeListFilter === list.id ? null : list.id)}
+              >
+                {list.icon} {list.name}
+              </Button>
+            ))}
+          </div>
+        )}
+
+        {filteredLibrary.length === 0 ? (
           <div className="text-center py-16 border border-dashed border-border rounded-xl">
             <BookOpen className="w-10 h-10 text-muted-foreground/30 mx-auto mb-3" />
             <p className="text-muted-foreground font-sans-ui text-sm">
-              No saved novels yet. Paste a URL above to get started.
+              {activeListFilter ? 'No novels in this list yet.' : 'No saved novels yet. Paste a URL above to get started.'}
             </p>
           </div>
         ) : (
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
-            {library.map(novel => (
+            {filteredLibrary.map(novel => (
               <NovelCard
                 key={novel.id}
                 novel={novel}
                 onOpen={handleOpenNovel}
                 onDelete={handleDeleteNovel}
+                lists={readingLists.lists}
+                selectedListIds={readingLists.getNovelLists(novel.id)}
+                onToggleList={(listId, checked) => handleToggleList(listId, novel.id, checked)}
               />
             ))}
           </div>

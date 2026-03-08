@@ -1,7 +1,8 @@
-import { useRef, useEffect, useState, useMemo } from 'react';
+import { useRef, useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { ChevronLeft, ChevronRight, Loader2, Bookmark, BookmarkCheck, ArrowUp, ArrowDown, BookOpen } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Bookmark, BookmarkCheck, ArrowUp, ArrowDown, BookOpen } from 'lucide-react';
+import TTSControls from '@/components/reader/TTSControls';
 import type { Chapter } from '@/lib/novel-store';
 import type { Bookmark as BookmarkType } from '@/lib/bookmarks';
 
@@ -18,6 +19,24 @@ interface ReaderViewProps {
   chapterBookmarks?: BookmarkType[];
   onAddBookmark?: (scrollPosition: number, label?: string) => void;
   onRemoveBookmark?: (id: string) => void;
+  ttsCurrentIndex?: number;
+  isImmersive?: boolean;
+  tts?: {
+    isPlaying: boolean;
+    isPaused: boolean;
+    currentIndex: number;
+    totalParagraphs: number;
+    speed: number;
+    setSpeed: (s: any) => void;
+    voices: SpeechSynthesisVoice[];
+    selectedVoice: string;
+    setSelectedVoice: (v: string) => void;
+    autoAdvance: boolean;
+    setAutoAdvance: (v: boolean) => void;
+    play: () => void;
+    pause: () => void;
+    stop: () => void;
+  };
 }
 
 const ReaderView = ({
@@ -33,6 +52,9 @@ const ReaderView = ({
   chapterBookmarks = [],
   onAddBookmark,
   onRemoveBookmark,
+  ttsCurrentIndex = -1,
+  isImmersive = false,
+  tts,
 }: ReaderViewProps) => {
   const scrollRef = useRef<HTMLDivElement>(null);
   const [currentScrollTop, setCurrentScrollTop] = useState(0);
@@ -58,6 +80,18 @@ const ReaderView = ({
     el.addEventListener('scroll', handleScroll, { passive: true });
     return () => el.removeEventListener('scroll', handleScroll);
   }, [chapter?.id, onChapterReady, onScroll]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Auto-scroll to TTS active paragraph
+  useEffect(() => {
+    if (ttsCurrentIndex < 0) return;
+    const el = scrollRef.current;
+    if (!el) return;
+    const paragraphs = el.querySelectorAll('[data-para-index]');
+    const target = paragraphs[ttsCurrentIndex] as HTMLElement;
+    if (target) {
+      target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+  }, [ttsCurrentIndex]);
 
   const nearbyBookmark = chapterBookmarks.find(
     b => Math.abs(b.scrollPosition - currentScrollTop) <= 50,
@@ -123,6 +157,15 @@ const ReaderView = ({
     if (el) el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' });
   };
 
+  // Split content into paragraphs for TTS highlighting
+  const isChapterTitle = (text: string) => {
+    const t = text.trim();
+    return /^(chapter|ch\.?|episode|part|book|volume)\s+\d+/i.test(t)
+      || (t.length < 50 && /^[#*]/.test(t));
+  };
+
+  let paraIndex = 0;
+
   return (
     <div className="flex flex-col h-full bg-reader relative">
       {/* Reading progress bar */}
@@ -137,7 +180,7 @@ const ReaderView = ({
         ref={scrollRef}
         className="flex-1 overflow-y-auto scrollbar-thin"
       >
-        <div className="max-w-2xl mx-auto px-5 sm:px-10 py-8 sm:py-14 animate-fade-in">
+        <div className={`max-w-2xl mx-auto px-5 sm:px-10 py-8 sm:py-14 animate-fade-in ${isImmersive ? 'max-w-3xl' : ''}`}>
           {/* Chapter header */}
           <header className="mb-8 sm:mb-12">
             {novelTitle && (
@@ -160,25 +203,26 @@ const ReaderView = ({
                 fontFamily: 'var(--reader-font-family, serif)',
               }}
             >
-          {(() => {
-            const isChapterTitle = (text: string) => {
-              const t = text.trim();
-              return /^(chapter|ch\.?|episode|part|book|volume)\s+\d+/i.test(t)
-                || (t.length < 50 && /^[#*]/.test(t));
-            };
-            let foundFirst = false;
-            return chapter.content.split('\n\n').map((para, i) => {
-              const trimmed = para.trim();
-              if (!trimmed) return null;
-              const isFirst = !foundFirst && !isChapterTitle(trimmed) && trimmed.length > 30;
-              if (isFirst) foundFirst = true;
-              return (
-                <p key={i} className={isFirst ? 'reader-first-paragraph' : ''}>
-                  {trimmed}
-                </p>
-              );
-            });
-          })()}
+              {(() => {
+                let foundFirst = false;
+                return chapter.content!.split('\n\n').map((para, i) => {
+                  const trimmed = para.trim();
+                  if (!trimmed) return null;
+                  const isFirst = !foundFirst && !isChapterTitle(trimmed) && trimmed.length > 30;
+                  if (isFirst) foundFirst = true;
+                  const idx = paraIndex++;
+                  const isTTSActive = ttsCurrentIndex === idx;
+                  return (
+                    <p
+                      key={i}
+                      data-para-index={idx}
+                      className={`${isFirst ? 'reader-first-paragraph' : ''} ${isTTSActive ? 'tts-active-paragraph' : ''} transition-colors duration-300`}
+                    >
+                      {trimmed}
+                    </p>
+                  );
+                });
+              })()}
             </div>
           ) : (
             <p className="text-muted-foreground font-sans-ui italic text-center py-12">
@@ -242,8 +286,28 @@ const ReaderView = ({
         </div>
       )}
 
+      {/* TTS Controls */}
+      {tts && chapter.content && (
+        <TTSControls
+          isPlaying={tts.isPlaying}
+          isPaused={tts.isPaused}
+          currentIndex={tts.currentIndex}
+          totalParagraphs={tts.totalParagraphs}
+          speed={tts.speed as any}
+          onSpeedChange={tts.setSpeed}
+          voices={tts.voices}
+          selectedVoice={tts.selectedVoice}
+          onVoiceChange={tts.setSelectedVoice}
+          autoAdvance={tts.autoAdvance}
+          onAutoAdvanceChange={tts.setAutoAdvance}
+          onPlay={tts.play}
+          onPause={tts.pause}
+          onStop={tts.stop}
+        />
+      )}
+
       {/* Bottom navigation */}
-      <div className="reader-nav-bar px-3 sm:px-6 py-3.5 flex items-center justify-between">
+      <div className={`reader-nav-bar px-3 sm:px-6 py-3.5 flex items-center justify-between ${isImmersive ? 'opacity-0 pointer-events-none' : ''}`}>
         <Button
           variant="outline"
           size="sm"

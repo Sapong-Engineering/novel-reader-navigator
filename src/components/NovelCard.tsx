@@ -12,15 +12,20 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
+import AddToListMenu from '@/components/AddToListMenu';
 import type { Novel } from '@/lib/novel-store';
+import type { ReadingList } from '@/hooks/useReadingLists';
 
 interface NovelCardProps {
   novel: Novel;
   onOpen: (novel: Novel) => void;
   onDelete: (id: string) => void;
+  lists?: ReadingList[];
+  selectedListIds?: string[];
+  onToggleList?: (listId: string, checked: boolean) => void;
 }
 
-const NovelCard = ({ novel, onOpen, onDelete }: NovelCardProps) => {
+const NovelCard = ({ novel, onOpen, onDelete, lists = [], selectedListIds = [], onToggleList }: NovelCardProps) => {
   const [dialogOpen, setDialogOpen] = useState(false);
   const savedCount = novel.chapters.filter(c => c.content).length;
   const savedDate = new Date(novel.savedAt).toLocaleDateString();
@@ -59,6 +64,16 @@ const NovelCard = ({ novel, onOpen, onDelete }: NovelCardProps) => {
           {savedCount}/{novel.chapters.length} chapters · {savedDate}
         </p>
       </div>
+
+      {/* Add to list */}
+      {lists.length > 0 && onToggleList && (
+        <AddToListMenu
+          novelLocalId={novel.id}
+          lists={lists}
+          selectedListIds={selectedListIds}
+          onToggle={onToggleList}
+        />
+      )}
 
       {/* Delete with confirmation */}
       <AlertDialog open={dialogOpen} onOpenChange={setDialogOpen}>

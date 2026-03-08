@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Bell, Check, Trash2, Info, CheckCircle2, AlertTriangle, XCircle } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { Bell, Check, Trash2, Info, CheckCircle2, AlertTriangle, XCircle, BookOpen } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -12,6 +13,17 @@ import {
   clearNotificationHistory,
   subscribeNotifications,
 } from '@/lib/notify';
+import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/hooks/useAuth';
+
+interface ChapterUpdate {
+  id: string;
+  novel_id: string;
+  novel_title: string;
+  chapter_count: number;
+  discovered_at: string;
+  seen: boolean;
+}
 
 function formatTime(iso: string): string {
   const d = new Date(iso);
@@ -41,8 +53,11 @@ const typeColor: Record<NotificationType, string> = {
 };
 
 const NotificationCenter = () => {
+  const navigate = useNavigate();
+  const { user } = useAuth();
   const [notifications, setNotifications] = useState<AppNotification[]>(getNotificationHistory);
   const [unread, setUnread] = useState(getUnreadCount);
+  const [chapterUpdates, setChapterUpdates] = useState<ChapterUpdate[]>([]);
   const [open, setOpen] = useState(false);
 
   useEffect(() => {
@@ -51,6 +66,23 @@ const NotificationCenter = () => {
       setUnread(getUnreadCount());
     });
   }, []);
+
+  // Fetch chapter updates
+  useEffect(() => {
+    if (!user) return;
+    supabase
+      .from('chapter_updates')
+      .select('id, novel_id, novel_title, chapter_count, discovered_at, seen')
+      .eq('user_id', user.id)
+      .eq('seen', false)
+      .order('discovered_at', { ascending: false })
+      .limit(20)
+      .then(({ data }) => {
+        setChapterUpdates((data as ChapterUpdate[]) ?? []);
+      });
+  }, [user, open]);
+
+  const totalUnread = unread + chapterUpdates.length;
 
   const handleOpen = useCallback((isOpen: boolean) => {
     setOpen(isOpen);
@@ -63,14 +95,27 @@ const NotificationCenter = () => {
     clearNotificationHistory();
   }, []);
 
+  const handleChapterUpdateClick = useCallback(async (update: ChapterUpdate) => {
+    // Mark as seen
+    await supabase
+      .from('chapter_updates')
+      .update({ seen: true })
+      .eq('id', update.id);
+    setChapterUpdates(prev => prev.filter(u => u.id !== update.id));
+    setOpen(false);
+    // Navigate to reader - novel_id is the DB uuid, but we need local id
+    // For simplicity navigate to library and let user click
+    navigate('/');
+  }, [navigate]);
+
   return (
     <Popover open={open} onOpenChange={handleOpen}>
       <PopoverTrigger asChild>
         <Button variant="ghost" size="icon" className="relative" aria-label="Notifications">
           <Bell className="w-4 h-4" />
-          {unread > 0 && (
+          {totalUnread > 0 && (
             <span className="absolute -top-0.5 -right-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-primary px-1 text-[10px] font-bold text-primary-foreground">
-              {unread > 9 ? '9+' : unread}
+              {totalUnread > 9 ? '9+' : totalUnread}
             </span>
           )}
         </Button>
@@ -79,7 +124,7 @@ const NotificationCenter = () => {
         <div className="flex items-center justify-between px-4 py-3 border-b border-border">
           <h3 className="text-sm font-semibold font-sans-ui">Notifications</h3>
           <div className="flex gap-1">
-            {notifications.length > 0 && (
+            {(notifications.length > 0 || chapterUpdates.length > 0) && (
               <>
                 <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => markAllRead()} aria-label="Mark all read">
                   <Check className="w-3.5 h-3.5" />
@@ -92,7 +137,24 @@ const NotificationCenter = () => {
           </div>
         </div>
         <ScrollArea className="max-h-80">
-          {notifications.length === 0 ? (
+          {/* Chapter update notifications */}
+          {chapterUpdates.map(update => (
+            <button
+              key={update.id}
+              className="flex gap-3 px-4 py-3 w-full text-left bg-accent/30 hover:bg-accent/50 transition-colors border-b border-border"
+              onClick={() => handleChapterUpdateClick(update)}
+            >
+              <BookOpen className="w-4 h-4 mt-0.5 flex-shrink-0 text-primary" />
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-sans-ui text-foreground leading-snug">
+                  <strong>{update.chapter_count}</strong> new chapter{update.chapter_count > 1 ? 's' : ''} for <strong className="truncate">{update.novel_title || 'a novel'}</strong>
+                </p>
+                <p className="text-xs text-muted-foreground font-sans-ui mt-0.5">{formatTime(update.discovered_at)}</p>
+              </div>
+            </button>
+          ))}
+
+          {notifications.length === 0 && chapterUpdates.length === 0 ? (
             <div className="py-8 text-center">
               <Bell className="w-8 h-8 text-muted-foreground/30 mx-auto mb-2" />
               <p className="text-sm text-muted-foreground font-sans-ui">No notifications yet</p>

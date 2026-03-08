@@ -24,7 +24,6 @@ Deno.serve(async (req) => {
   const supabase = createClient(supabaseUrl, serviceRoleKey);
 
   try {
-    // Parse optional interval_hours from request body (default 24)
     let intervalHours = 24;
     try {
       const body = await req.json();
@@ -35,10 +34,9 @@ Deno.serve(async (req) => {
 
     const cutoff = new Date(Date.now() - intervalHours * 60 * 60 * 1000).toISOString();
 
-    // Get novels not refreshed within the interval
     const { data: novels, error: novelsErr } = await supabase
       .from('novels')
-      .select('id, local_id, url, user_id, updated_at')
+      .select('id, local_id, url, user_id, updated_at, title')
       .lt('updated_at', cutoff)
       .order('updated_at', { ascending: true })
       .limit(50);
@@ -55,7 +53,6 @@ Deno.serve(async (req) => {
 
     for (const novel of novels) {
       try {
-        // Scrape current chapter list from source
         const scrapeRes = await fetch(`${supabaseUrl}/functions/v1/scrape-novel`, {
           method: 'POST',
           headers: {
@@ -75,7 +72,7 @@ Deno.serve(async (req) => {
 
         const remoteChapters: { id: string; title: string; url: string }[] = scrapeData.data.chapters;
 
-        // Get ALL existing chapter local_ids for this novel (paginated to avoid 1000-row limit)
+        // Get ALL existing chapter local_ids (paginated)
         const allExisting: { local_id: string }[] = [];
         let from = 0;
         const PAGE = 1000;
@@ -92,8 +89,6 @@ Deno.serve(async (req) => {
         }
 
         const existingIds = new Set(allExisting.map(c => c.local_id));
-
-        // Find new chapters
         const newChapters = remoteChapters.filter(ch => !existingIds.has(ch.id));
 
         if (newChapters.length > 0) {
@@ -113,6 +108,14 @@ Deno.serve(async (req) => {
           } else {
             newChaptersTotal += newChapters.length;
             console.log(`[refresh] Added ${newChapters.length} new chapters for "${novel.url}"`);
+
+            // Record chapter update notification for the user
+            await supabase.from('chapter_updates').insert({
+              user_id: novel.user_id,
+              novel_id: novel.id,
+              novel_title: novel.title || '',
+              chapter_count: newChapters.length,
+            });
           }
         }
 
