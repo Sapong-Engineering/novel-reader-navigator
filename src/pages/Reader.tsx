@@ -72,7 +72,6 @@ const Reader = () => {
   async function handleSelectChapter(chapter: Chapter) {
     if (chapter.content) {
       setActiveChapter(chapter);
-      // Sync last-read to backend
       syncProgressToBackend(novelIdStr, chapter.id, 0, true);
       return;
     }
@@ -87,14 +86,18 @@ const Reader = () => {
     }
 
     try {
-      const content = await scrapeChapterContent(chapter.url);
+      // Try backend first, then scrape as fallback
+      let content = await fetchChapterContentFromBackend(novelIdStr, chapter.id);
+      if (!content) {
+        content = await scrapeChapterContent(chapter.url);
+      }
       const updated: Chapter = { ...chapter, content, savedAt: new Date().toISOString() };
       setActiveChapter(updated);
       setNovel(prev => {
         if (!prev) return prev;
         const newNovel = { ...prev, chapters: prev.chapters.map(c => c.id === chapter.id ? updated : c) };
         saveNovel(newNovel);
-        syncNovel(newNovel); // sync fetched chapter to backend
+        syncNovel(newNovel);
         return newNovel;
       });
       syncProgressToBackend(novelIdStr, chapter.id, 0, true);
