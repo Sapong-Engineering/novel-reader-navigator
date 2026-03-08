@@ -3,6 +3,7 @@ import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { Slider } from '@/components/ui/slider';
 import { Separator } from '@/components/ui/separator';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Settings, Sun, Moon, Monitor, Minus, Plus, RefreshCw, Wrench, RotateCcw } from 'lucide-react';
 import { useThemeContext } from '@/contexts/ThemeContext';
 import { useReaderContext } from '@/contexts/ReaderContext';
@@ -144,6 +145,25 @@ const SettingsPanel = ({ onSync, onRepairChapterOrder, trigger }: SettingsPanelP
                   Sync Now
                 </Button>
               )}
+              <div>
+                <label className="text-sm font-sans-ui text-foreground mb-2 block">Auto-refresh interval</label>
+                <Select
+                  value={String(appSettings.refreshIntervalHours)}
+                  onValueChange={(v) => appSettings.setRefreshIntervalHours(Number(v))}
+                  disabled={!appSettings.syncEnabled}
+                >
+                  <SelectTrigger className="font-sans-ui">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="6">Every 6 hours</SelectItem>
+                    <SelectItem value="12">Every 12 hours</SelectItem>
+                    <SelectItem value="24">Every 24 hours</SelectItem>
+                    <SelectItem value="48">Every 48 hours</SelectItem>
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground font-sans-ui mt-1">How often the backend checks for new chapters</p>
+              </div>
               {onRepairChapterOrder && (
                 <Button variant="outline" size="sm" onClick={onRepairChapterOrder} className="w-full font-sans-ui">
                   <Wrench className="w-4 h-4 mr-2" />

@@ -6,6 +6,7 @@ export interface AppSettings {
   notificationsEnabled: boolean;
   notifyNewChapters: boolean;
   autoFetchNewChapters: boolean;
+  refreshIntervalHours: number;
 }
 
 export interface AppSettingsContextValue extends AppSettings {
@@ -13,6 +14,7 @@ export interface AppSettingsContextValue extends AppSettings {
   setNotificationsEnabled: (v: boolean) => void;
   setNotifyNewChapters: (v: boolean) => void;
   setAutoFetchNewChapters: (v: boolean) => void;
+  setRefreshIntervalHours: (v: number) => void;
   resetAll: () => void;
 }
 
@@ -23,6 +25,7 @@ const DEFAULTS: AppSettings = {
   notificationsEnabled: true,
   notifyNewChapters: true,
   autoFetchNewChapters: false,
+  refreshIntervalHours: 24,
 };
 
 function load(): AppSettings {
@@ -54,6 +57,7 @@ export function AppSettingsProvider({ children }: { children: ReactNode }) {
     setNotificationsEnabled: v => update({ notificationsEnabled: v }),
     setNotifyNewChapters: v => update({ notifyNewChapters: v }),
     setAutoFetchNewChapters: v => update({ autoFetchNewChapters: v }),
+    setRefreshIntervalHours: v => update({ refreshIntervalHours: v }),
     resetAll: () => setSettings(DEFAULTS),
   };
 
