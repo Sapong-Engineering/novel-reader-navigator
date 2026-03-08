@@ -17,7 +17,7 @@ interface SettingsPanelProps {
 }
 
 const SettingsPanel = ({ onSync, onRepairChapterOrder, trigger }: SettingsPanelProps) => {
-  const { resolvedTheme, setTheme } = useThemeContext();
+  const { theme, setTheme } = useThemeContext();
   const { settings: readerSettings, setFontSize, setFontFamily } = useReaderContext();
   const appSettings = useAppSettings();
 
