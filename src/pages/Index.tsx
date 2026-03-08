@@ -115,6 +115,21 @@ const Index = () => {
     toast.success('Signed out');
   }, [signOut]);
 
+  const handleManualSync = useCallback(async () => {
+    if (!user) return;
+    setIsSyncing(true);
+    toast.info('Syncing library...');
+    try {
+      const novels = await syncLibraryFromBackend();
+      setLibrary(novels);
+      toast.success('Library synced!');
+    } catch {
+      toast.error('Sync failed');
+    } finally {
+      setIsSyncing(false);
+    }
+  }, [user]);
+
   return (
     <div id="main-content" className="min-h-screen bg-background">
       {/* Top bar */}
