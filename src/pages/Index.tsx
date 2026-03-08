@@ -45,7 +45,7 @@ const Index = () => {
   // Sync library from backend when authenticated (guarded against double-fire)
   const syncedRef = useRef(false);
   useEffect(() => {
-    if (user && !authLoading && !syncedRef.current) {
+    if (user && !authLoading && !syncedRef.current && appSettings.syncEnabled) {
       syncedRef.current = true;
       setIsSyncing(true);
       syncLibraryFromBackend()
