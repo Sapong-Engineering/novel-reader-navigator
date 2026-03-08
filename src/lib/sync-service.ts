@@ -153,6 +153,7 @@ async function getOrCreateNovelId(localId: string, userId: string, novel: Novel)
 export async function syncLibraryFromBackend(): Promise<Novel[]> {
   const userId = await getUserId();
   if (!userId) return getLibrary();
+  setSyncStatus('syncing');
 
   try {
     // Fetch novels and chapter METADATA only (skip content for speed)
