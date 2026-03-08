@@ -14,7 +14,7 @@ import {
 import { syncLibraryFromBackend, syncNovel, syncDeleteNovel } from '@/lib/sync-service';
 import { orderChapters } from '@/lib/chapter-order';
 import { useAuth } from '@/hooks/useAuth';
-import { BookOpen, LogOut, LogIn, Loader2, WifiOff } from 'lucide-react';
+import { BookOpen, LogOut, LogIn, Loader2, WifiOff, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import SyncIndicator from '@/components/SyncIndicator';
 
