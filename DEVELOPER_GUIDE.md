@@ -601,7 +601,31 @@ Both yield to the UI thread between chapters via `setTimeout(0)`.
 
 Extracts chapter numbers from title/id/url using regex patterns and sorts numerically with `localeCompare` fallback.
 
-### 5.10 Utility Classes
+### 5.10 `src/lib/validation.ts` — URL Validation
+
+Input validation and sanitization for novel URLs.
+
+| Function        | Purpose                                                     |
+|----------------|-------------------------------------------------------------|
+| `sanitizeUrl()` | Trim + auto-prefix `https://` if no protocol present       |
+| `validateUrl()` | Full validation: malicious pattern check, protocol whitelist, length limit, domain requirement |
+
+**Malicious patterns blocked**: `javascript:`, `data:`, `vbscript:`, `<script` tags.  
+**Defaults**: `http:`/`https:` only, max 2048 chars, domain required.  
+Returns `{ valid, error?, sanitized? }`.
+
+### 5.11 `src/lib/export-utils.ts` — Simple Export (Legacy)
+
+Synchronous export functions without progress tracking. Used as a simpler alternative to `export-service.ts`.
+
+| Function          | Purpose                                           |
+|-------------------|---------------------------------------------------|
+| `exportToPdf()`   | Generate PDF with jsPDF (no progress/cancel)      |
+| `exportToDocx()`  | Generate DOCX with docx library (no progress/cancel) |
+
+**Difference from `export-service.ts`**: The `export-service.ts` version adds `onProgress` callbacks, `AbortSignal` cancellation, and `setTimeout(0)` yields between chapters. Use `export-service.ts` for large novels; `export-utils.ts` for quick single-chapter exports.
+
+### 5.12 Utility Classes
 
 | Class          | File                       | Purpose                                       |
 |---------------|---------------------------|------------------------------------------------|
