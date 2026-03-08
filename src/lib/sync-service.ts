@@ -2,6 +2,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { type Novel, type Chapter, getLibrary, saveNovel, deleteNovel as deleteLocalNovel } from './novel-store';
 import { getBookmarks, type Bookmark } from './bookmarks';
 import { getReadingProgress, saveReadingProgress, getLastReadChapter, saveLastReadChapter } from './storage-manager';
+import { setSyncStatus } from '@/hooks/useSyncStatus';
 
 // ── Caches ──
 
