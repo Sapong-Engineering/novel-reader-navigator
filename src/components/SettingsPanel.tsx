@@ -17,7 +17,7 @@ interface SettingsPanelProps {
 }
 
 const SettingsPanel = ({ onSync, onRepairChapterOrder, trigger }: SettingsPanelProps) => {
-  const { resolvedTheme, setTheme } = useThemeContext();
+  const { theme, setTheme } = useThemeContext();
   const { settings: readerSettings, setFontSize, setFontFamily } = useReaderContext();
   const appSettings = useAppSettings();
 
@@ -56,7 +56,7 @@ const SettingsPanel = ({ onSync, onRepairChapterOrder, trigger }: SettingsPanelP
             <div className="flex gap-2">
               {themeOptions.map(opt => {
                 const Icon = opt.icon;
-                const active = resolvedTheme === opt.value || (opt.value === 'system' && !['light', 'dark'].includes(resolvedTheme ?? ''));
+                const active = theme === opt.value;
                 return (
                   <Button
                     key={opt.value}
