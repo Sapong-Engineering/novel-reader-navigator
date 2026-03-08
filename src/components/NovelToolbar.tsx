@@ -41,6 +41,8 @@ const NovelToolbar = ({
   fetchProgress,
   mobileChapterDrawer,
   showReaderSettings = false,
+  onSync,
+  onRepairChapterOrder,
 }: NovelToolbarProps) => {
   const progressPercent = fetchProgress?.total ? (fetchProgress.current / fetchProgress.total) * 100 : 0;
 
