@@ -11,6 +11,7 @@ import {
 import { Progress } from '@/components/ui/progress';
 import { ReaderSettingsPopover } from '@/components/reader/ReaderSettingsPopover';
 import SettingsPanel from '@/components/SettingsPanel';
+import NotificationCenter from '@/components/NotificationCenter';
 
 interface NovelToolbarProps {
   title: string;
@@ -87,6 +88,7 @@ const NovelToolbar = ({
         )}
 
         <SyncIndicator />
+        <NotificationCenter />
 
         {showReaderSettings && <ReaderSettingsPopover onRepairChapterOrder={onRepairChapterOrder} />}
 

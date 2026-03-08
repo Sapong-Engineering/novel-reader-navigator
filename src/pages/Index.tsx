@@ -18,6 +18,7 @@ import { BookOpen, LogOut, LogIn, Loader2, WifiOff, RefreshCw } from 'lucide-rea
 import { Button } from '@/components/ui/button';
 import SyncIndicator from '@/components/SyncIndicator';
 import SettingsPanel from '@/components/SettingsPanel';
+import NotificationCenter from '@/components/NotificationCenter';
 import { useAppSettings } from '@/contexts/AppSettingsContext';
 import { isSyncEnabled } from '@/lib/notify';
 
@@ -148,6 +149,7 @@ const Index = () => {
           </Button>
         )}
         <SyncIndicator />
+        <NotificationCenter />
         <SettingsPanel onSync={user ? handleManualSync : undefined} />
         {authLoading ? null : user ? (
           <>
