@@ -11,6 +11,7 @@ const corsHeaders = {
 
 const registry = new AdapterRegistry(new DefaultAdapter());
 registry.register(new WuxiaClickAdapter());
+registry.register(new NovelBinAdapter());
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
