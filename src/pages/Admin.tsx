@@ -74,6 +74,9 @@ const Admin = () => {
             <TabsTrigger value="content" className="gap-1.5">
               <BookOpen className="w-3.5 h-3.5" /> Content
             </TabsTrigger>
+            <TabsTrigger value="preferences" className="gap-1.5">
+              <Settings className="w-3.5 h-3.5" /> Preferences
+            </TabsTrigger>
           </TabsList>
 
           <TabsContent value="analytics">
