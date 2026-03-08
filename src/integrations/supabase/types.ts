@@ -76,6 +76,44 @@ export type Database = {
           },
         ]
       }
+      chapter_updates: {
+        Row: {
+          chapter_count: number
+          discovered_at: string
+          id: string
+          novel_id: string
+          novel_title: string
+          seen: boolean
+          user_id: string
+        }
+        Insert: {
+          chapter_count?: number
+          discovered_at?: string
+          id?: string
+          novel_id: string
+          novel_title?: string
+          seen?: boolean
+          user_id: string
+        }
+        Update: {
+          chapter_count?: number
+          discovered_at?: string
+          id?: string
+          novel_id?: string
+          novel_title?: string
+          seen?: boolean
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "chapter_updates_novel_id_fkey"
+            columns: ["novel_id"]
+            isOneToOne: false
+            referencedRelation: "novels"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       chapters: {
         Row: {
           content: string | null
@@ -189,6 +227,65 @@ export type Database = {
         }
         Relationships: []
       }
+      reading_list_items: {
+        Row: {
+          added_at: string
+          id: string
+          list_id: string
+          novel_local_id: string
+          user_id: string
+        }
+        Insert: {
+          added_at?: string
+          id?: string
+          list_id: string
+          novel_local_id: string
+          user_id: string
+        }
+        Update: {
+          added_at?: string
+          id?: string
+          list_id?: string
+          novel_local_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "reading_list_items_list_id_fkey"
+            columns: ["list_id"]
+            isOneToOne: false
+            referencedRelation: "reading_lists"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      reading_lists: {
+        Row: {
+          created_at: string
+          icon: string | null
+          id: string
+          name: string
+          sort_order: number
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          icon?: string | null
+          id?: string
+          name: string
+          sort_order?: number
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          icon?: string | null
+          id?: string
+          name?: string
+          sort_order?: number
+          user_id?: string
+        }
+        Relationships: []
+      }
       reading_progress: {
         Row: {
           chapter_local_id: string
@@ -226,6 +323,33 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      reading_stats: {
+        Row: {
+          chapters_read: number
+          date: string
+          id: string
+          reading_seconds: number
+          user_id: string
+          words_read: number
+        }
+        Insert: {
+          chapters_read?: number
+          date?: string
+          id?: string
+          reading_seconds?: number
+          user_id: string
+          words_read?: number
+        }
+        Update: {
+          chapters_read?: number
+          date?: string
+          id?: string
+          reading_seconds?: number
+          user_id?: string
+          words_read?: number
+        }
+        Relationships: []
       }
       user_roles: {
         Row: {
