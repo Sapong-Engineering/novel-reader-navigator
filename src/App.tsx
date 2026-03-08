@@ -8,6 +8,7 @@ import Reader from "./pages/Reader";
 import Auth from "./pages/Auth";
 import NotFound from "./pages/NotFound";
 import ErrorBoundary from "./components/ErrorBoundary";
+import SyncErrorBanner from "./components/SyncErrorBanner";
 import { ThemeProvider } from "./contexts/ThemeContext";
 import { ReaderProvider } from "./contexts/ReaderContext";
 
@@ -21,6 +22,7 @@ const App = () => (
           <TooltipProvider>
             <Toaster />
             <Sonner />
+            <SyncErrorBanner />
             <BrowserRouter>
               <Routes>
                 <Route path="/" element={<Index />} />
