@@ -39,6 +39,13 @@ export function cleanChapterContent(markdown: string, url: string): string {
   // Remove empty markdown headings
   content = content.replace(/^#{1,6}\s*$/gm, '');
 
+  // Ensure chapter title lines are separated from body text with double newlines
+  // Matches "Chapter N", "Ch. N", "Episode N", "Part N", "Volume N", "Book N"
+  content = content.replace(
+    /^((?:Chapter|Ch\.?|Episode|Part|Book|Volume)\s+\d+[^\n]*)\n(?!\n)/gim,
+    '$1\n\n'
+  );
+
   // Clean up excessive newlines
   content = content.replace(/\n{4,}/g, '\n\n\n');
 
