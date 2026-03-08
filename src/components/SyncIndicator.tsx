@@ -14,7 +14,6 @@ const SyncIndicator = () => {
     const onOffline = () => { setIsOnline(false); setQueueLen(getQueueLength()); };
     window.addEventListener('online', onOnline);
     window.addEventListener('offline', onOffline);
-    // Refresh queue length periodically when offline
     const interval = setInterval(() => setQueueLen(getQueueLength()), 3000);
     return () => {
       window.removeEventListener('online', onOnline);
@@ -23,19 +22,21 @@ const SyncIndicator = () => {
     };
   }, []);
 
-  // Update queue length on sync status change
   useEffect(() => {
     setQueueLen(getQueueLength());
   }, [status]);
 
-  // Offline state takes priority
   if (!isOnline) {
     return (
       <TooltipProvider delayDuration={200}>
         <Tooltip>
           <TooltipTrigger asChild>
-            <div className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-destructive/10 text-xs font-sans-ui text-destructive select-none">
-              <WifiOff className="w-4 h-4" />
+            <div
+              role="status"
+              aria-live="polite"
+              className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-destructive/10 text-xs font-sans-ui text-destructive select-none"
+            >
+              <WifiOff className="w-4 h-4" aria-hidden="true" />
               <span className="hidden sm:inline">
                 Offline{queueLen > 0 ? ` (${queueLen} pending)` : ''}
               </span>
@@ -53,15 +54,15 @@ const SyncIndicator = () => {
 
   const config = {
     syncing: {
-      icon: <Loader2 className="w-4 h-4 animate-spin text-primary" />,
+      icon: <Loader2 className="w-4 h-4 animate-spin text-primary" aria-hidden="true" />,
       label: 'Syncing…',
     },
     done: {
-      icon: <CheckCircle2 className="w-4 h-4 text-emerald-500" />,
+      icon: <CheckCircle2 className="w-4 h-4 text-emerald-500" aria-hidden="true" />,
       label: 'Synced',
     },
     error: {
-      icon: <CloudOff className="w-4 h-4 text-destructive" />,
+      icon: <CloudOff className="w-4 h-4 text-destructive" aria-hidden="true" />,
       label: 'Sync failed',
     },
   }[status];
@@ -72,7 +73,11 @@ const SyncIndicator = () => {
     <TooltipProvider delayDuration={200}>
       <Tooltip>
         <TooltipTrigger asChild>
-          <div className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-muted/50 text-xs font-sans-ui text-muted-foreground select-none">
+          <div
+            role="status"
+            aria-live="polite"
+            className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-muted/50 text-xs font-sans-ui text-muted-foreground select-none"
+          >
             {config.icon}
             <span className="hidden sm:inline">{config.label}</span>
           </div>

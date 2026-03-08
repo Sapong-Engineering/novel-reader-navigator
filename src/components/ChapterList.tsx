@@ -39,15 +39,18 @@ const ChapterList = ({
   bookmarkedChapterIds = new Set(),
 }: ChapterListProps) => {
   const [activeTab, setActiveTab] = useState<Tab>('chapters');
-  const { searchQuery, setSearchQuery, filteredChapters, resultCount, clearSearch, highlightMatch } =
+  const { searchQuery, setSearchQuery, filteredChapters, resultCount, clearSearch, getHighlightSegments } =
     useChapterSearch(chapters);
 
   return (
     <div className="flex flex-col h-full overflow-hidden">
       {/* Tab header */}
-      <div className="flex-shrink-0 border-b border-border">
+      <div className="flex-shrink-0 border-b border-border" role="tablist" aria-label="Chapter list tabs">
         <div className="flex">
           <button
+            role="tab"
+            aria-selected={activeTab === 'chapters'}
+            aria-controls="panel-chapters"
             onClick={() => setActiveTab('chapters')}
             className={`flex-1 py-2.5 text-xs font-sans-ui font-medium transition-colors border-b-2 -mb-px ${
               activeTab === 'chapters'
@@ -58,6 +61,9 @@ const ChapterList = ({
             Chapters ({chapters.length})
           </button>
           <button
+            role="tab"
+            aria-selected={activeTab === 'bookmarks'}
+            aria-controls="panel-bookmarks"
             onClick={() => setActiveTab('bookmarks')}
             className={`flex-1 py-2.5 text-xs font-sans-ui font-medium transition-colors border-b-2 -mb-px ${
               activeTab === 'bookmarks'
@@ -72,14 +78,15 @@ const ChapterList = ({
 
       {/* Chapters panel */}
       {activeTab === 'chapters' && (
-        <div className="flex flex-col flex-1 min-h-0">
+        <div id="panel-chapters" role="tabpanel" className="flex flex-col flex-1 min-h-0">
           <div className="flex-shrink-0 p-3 border-b border-border">
             <div className="relative">
-              <Search className="absolute left-2.5 top-2.5 w-3.5 h-3.5 text-muted-foreground" />
+              <Search className="absolute left-2.5 top-2.5 w-3.5 h-3.5 text-muted-foreground" aria-hidden="true" />
               <Input
                 value={searchQuery}
                 onChange={e => setSearchQuery(e.target.value)}
                 placeholder="Search chapters..."
+                aria-label="Search chapters"
                 className="pl-8 pr-8 h-8 text-sm font-sans-ui"
               />
               {searchQuery && (
@@ -88,13 +95,14 @@ const ChapterList = ({
                   size="icon"
                   className="absolute right-1 top-1 h-6 w-6"
                   onClick={clearSearch}
+                  aria-label="Clear search"
                 >
                   <X className="w-3 h-3" />
                 </Button>
               )}
             </div>
             {searchQuery && (
-              <p className="text-xs text-muted-foreground font-sans-ui mt-1.5">
+              <p className="text-xs text-muted-foreground font-sans-ui mt-1.5" aria-live="polite">
                 {resultCount} result{resultCount !== 1 ? 's' : ''}
               </p>
             )}
@@ -105,6 +113,7 @@ const ChapterList = ({
                 <button
                   key={chapter.id}
                   onClick={() => onSelectChapter(chapter)}
+                  aria-current={activeChapterId === chapter.id ? 'true' : undefined}
                   className={`w-full text-left px-3 py-2.5 rounded-lg mb-0.5 font-sans-ui text-sm transition-colors
                     ${activeChapterId === chapter.id
                       ? 'bg-chapter-active text-foreground font-medium'
@@ -113,18 +122,23 @@ const ChapterList = ({
                 >
                   <div className="flex items-center gap-2">
                     {chapter.content ? (
-                      <BookmarkCheck className="w-3.5 h-3.5 text-primary flex-shrink-0" />
+                      <BookmarkCheck className="w-3.5 h-3.5 text-primary flex-shrink-0" aria-label="Saved" />
                     ) : bookmarkedChapterIds.has(chapter.id) ? (
-                      <Bookmark className="w-3.5 h-3.5 text-amber-500 flex-shrink-0" />
+                      <Bookmark className="w-3.5 h-3.5 text-amber-500 flex-shrink-0" aria-label="Bookmarked" />
                     ) : null}
-                    {searchQuery ? (
-                      <span
-                        className="truncate"
-                        dangerouslySetInnerHTML={{ __html: highlightMatch(chapter.title) }}
-                      />
-                    ) : (
-                      <span className="truncate">{chapter.title}</span>
-                    )}
+                    <span className="truncate">
+                      {searchQuery
+                        ? getHighlightSegments(chapter.title).map((seg, i) =>
+                            seg.highlighted ? (
+                              <mark key={i} className="bg-primary/20 text-foreground rounded-sm px-0.5">
+                                {seg.text}
+                              </mark>
+                            ) : (
+                              <span key={i}>{seg.text}</span>
+                            ),
+                          )
+                        : chapter.title}
+                    </span>
                   </div>
                 </button>
               ))}
@@ -135,10 +149,10 @@ const ChapterList = ({
 
       {/* Bookmarks panel */}
       {activeTab === 'bookmarks' && (
-        <div className="flex flex-col flex-1 min-h-0">
+        <div id="panel-bookmarks" role="tabpanel" className="flex flex-col flex-1 min-h-0">
           {bookmarks.length === 0 ? (
             <div className="flex flex-col items-center justify-center flex-1 px-4 text-center gap-2">
-              <Bookmark className="w-8 h-8 text-muted-foreground/40" />
+              <Bookmark className="w-8 h-8 text-muted-foreground/40" aria-hidden="true" />
               <p className="text-sm text-muted-foreground font-sans-ui">No bookmarks yet</p>
               <p className="text-xs text-muted-foreground/70 font-sans-ui">
                 Use the bookmark icon while reading to save your place
@@ -167,9 +181,9 @@ const ChapterList = ({
                     <Button
                       variant="ghost"
                       size="icon"
-                      className="h-6 w-6 opacity-0 group-hover:opacity-100 flex-shrink-0 mt-0.5"
+                      className="h-6 w-6 opacity-0 group-hover:opacity-100 focus-visible:opacity-100 flex-shrink-0 mt-0.5"
                       onClick={() => onRemoveBookmark?.(bookmark.id)}
-                      title="Remove bookmark"
+                      aria-label={`Remove bookmark for ${bookmark.label || bookmark.chapterTitle}`}
                     >
                       <Trash2 className="w-3 h-3 text-muted-foreground" />
                     </Button>

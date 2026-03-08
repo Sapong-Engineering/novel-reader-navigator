@@ -1,13 +1,18 @@
 import { useState, useMemo, useCallback } from 'react';
 import type { Chapter } from '@/lib/novel-store';
 
+export interface HighlightSegment {
+  text: string;
+  highlighted: boolean;
+}
+
 export interface UseChapterSearchResult {
   searchQuery: string;
   setSearchQuery: (q: string) => void;
   filteredChapters: Chapter[];
   resultCount: number;
   clearSearch: () => void;
-  highlightMatch: (text: string) => string;
+  getHighlightSegments: (text: string) => HighlightSegment[];
 }
 
 export function useChapterSearch(chapters: Chapter[]): UseChapterSearchResult {
@@ -16,7 +21,6 @@ export function useChapterSearch(chapters: Chapter[]): UseChapterSearchResult {
   const filteredChapters = useMemo(() => {
     if (!searchQuery.trim()) return chapters;
     const q = searchQuery.trim().toLowerCase();
-    // Numeric filter: if query is a number, filter by chapter number in title
     const num = parseInt(q, 10);
     if (!isNaN(num) && String(num) === q) {
       return chapters.filter(c => {
@@ -29,17 +33,17 @@ export function useChapterSearch(chapters: Chapter[]): UseChapterSearchResult {
 
   const clearSearch = useCallback(() => setSearchQuery(''), []);
 
-  const highlightMatch = useCallback(
-    (text: string): string => {
-      if (!searchQuery.trim()) return text;
+  const getHighlightSegments = useCallback(
+    (text: string): HighlightSegment[] => {
+      if (!searchQuery.trim()) return [{ text, highlighted: false }];
       const q = searchQuery.trim();
       const idx = text.toLowerCase().indexOf(q.toLowerCase());
-      if (idx === -1) return text;
-      return (
-        text.slice(0, idx) +
-        `<mark>${text.slice(idx, idx + q.length)}</mark>` +
-        text.slice(idx + q.length)
-      );
+      if (idx === -1) return [{ text, highlighted: false }];
+      return [
+        { text: text.slice(0, idx), highlighted: false },
+        { text: text.slice(idx, idx + q.length), highlighted: true },
+        { text: text.slice(idx + q.length), highlighted: false },
+      ].filter(s => s.text.length > 0);
     },
     [searchQuery],
   );
@@ -50,6 +54,6 @@ export function useChapterSearch(chapters: Chapter[]): UseChapterSearchResult {
     filteredChapters,
     resultCount: filteredChapters.length,
     clearSearch,
-    highlightMatch,
+    getHighlightSegments,
   };
 }

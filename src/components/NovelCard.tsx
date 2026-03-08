@@ -1,5 +1,17 @@
+import { useState } from 'react';
 import { Book, Trash2, BookOpen } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from '@/components/ui/alert-dialog';
 import type { Novel } from '@/lib/novel-store';
 
 interface NovelCardProps {
@@ -9,6 +21,7 @@ interface NovelCardProps {
 }
 
 const NovelCard = ({ novel, onOpen, onDelete }: NovelCardProps) => {
+  const [dialogOpen, setDialogOpen] = useState(false);
   const savedCount = novel.chapters.filter(c => c.content).length;
   const savedDate = new Date(novel.savedAt).toLocaleDateString();
 
@@ -22,16 +35,16 @@ const NovelCard = ({ novel, onOpen, onDelete }: NovelCardProps) => {
         {novel.coverUrl ? (
           <img
             src={novel.coverUrl}
-            alt={novel.title}
+            alt={`Cover of ${novel.title}`}
             className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
           />
         ) : (
-          <Book className="w-12 h-12 text-muted-foreground/40" />
+          <Book className="w-12 h-12 text-muted-foreground/40" aria-hidden="true" />
         )}
         <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
         <div className="absolute bottom-3 left-3 right-3 opacity-0 group-hover:opacity-100 transition-opacity">
           <span className="inline-flex items-center gap-1.5 text-xs font-sans-ui font-medium text-white bg-primary/90 rounded-md px-2.5 py-1">
-            <BookOpen className="w-3 h-3" />
+            <BookOpen className="w-3 h-3" aria-hidden="true" />
             Read
           </span>
         </div>
@@ -47,18 +60,37 @@ const NovelCard = ({ novel, onOpen, onDelete }: NovelCardProps) => {
         </p>
       </div>
 
-      {/* Delete */}
-      <Button
-        variant="ghost"
-        size="icon"
-        className="absolute top-2 right-2 h-7 w-7 bg-background/80 backdrop-blur-sm opacity-0 group-hover:opacity-100 transition-opacity text-destructive hover:text-destructive"
-        onClick={(e) => {
-          e.stopPropagation();
-          onDelete(novel.id);
-        }}
-      >
-        <Trash2 className="w-3.5 h-3.5" />
-      </Button>
+      {/* Delete with confirmation */}
+      <AlertDialog open={dialogOpen} onOpenChange={setDialogOpen}>
+        <AlertDialogTrigger asChild>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="absolute top-2 right-2 h-7 w-7 bg-background/80 backdrop-blur-sm opacity-0 group-hover:opacity-100 focus-visible:opacity-100 transition-opacity text-destructive hover:text-destructive"
+            aria-label={`Delete ${novel.title}`}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <Trash2 className="w-3.5 h-3.5" />
+          </Button>
+        </AlertDialogTrigger>
+        <AlertDialogContent onClick={(e) => e.stopPropagation()}>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete "{novel.title}"?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently remove this novel and all saved chapters from your library. This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={() => onDelete(novel.id)}
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };
