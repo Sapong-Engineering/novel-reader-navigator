@@ -24,9 +24,10 @@ export class DefaultAdapter implements SiteAdapter {
       ? titleMatch[1].trim()
       : metadata.title || 'Unknown Novel';
 
-    // Extract description from Summary section
+    // Extract description from Summary section or #### Description
     const summaryMatch = markdown.match(/\*\*Summary\*\*(.+?)(?:\n\n|\[First Chapter)/s);
-    const description = summaryMatch ? summaryMatch[1].trim() : '';
+    const descSectionMatch = markdown.match(/####?\s*Description\s*\n([\s\S]*?)(?=\n#{1,4}\s|\n---|\n\*\*|$)/i);
+    const description = summaryMatch ? summaryMatch[1].trim() : descSectionMatch ? descSectionMatch[1].trim() : '';
 
     // Extract cover image
     const coverMatch = markdown.match(/!\[.*?\]\((.*?cover.*?)\)/i);
