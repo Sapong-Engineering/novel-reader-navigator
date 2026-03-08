@@ -8,6 +8,8 @@ export function cleanChapterContent(markdown: string, url: string): string {
   // ── Site-specific cleaning ──────────────────────────────────
   if (/wuxia\.click/i.test(url)) {
     content = cleanWuxiaClick(content);
+  } else if (/novelbin\.(?:com|net|me)/i.test(url)) {
+    content = cleanNovelBin(content);
   } else if (/empirenovel\.com/i.test(url)) {
     content = cleanEmpireNovel(content);
   }
@@ -149,6 +151,61 @@ function cleanWuxiaClick(content: string): string {
   }
 
   content = resultLines.join('\n');
+
+  return content;
+}
+
+/** novelbin.com specific cleanup */
+function cleanNovelBin(content: string): string {
+  const lines = content.split('\n');
+
+  // Find the chapter title line: "#### Chapter N: Title" or "Chapter N — Title"
+  let chapterTitleIdx = -1;
+  for (let i = 0; i < lines.length && i < 80; i++) {
+    const line = lines[i].trim();
+    if (/^#{0,6}\s*Chapter\s+\d+/i.test(line)) {
+      chapterTitleIdx = i;
+      break;
+    }
+  }
+
+  if (chapterTitleIdx > 0) {
+    content = lines.slice(chapterTitleIdx).join('\n');
+  }
+
+  // Remove markdown heading markers from chapter title
+  content = content.replace(/^#{1,6}\s+(Chapter\s+\d+)/m, '$1');
+
+  // Remove breadcrumb navigation at top
+  content = content.replace(/^\d+\.\s*\[.*?\]\(.*?\)\s*$/gim, '');
+
+  // Remove "Prev Chapter" / "Next Chapter" links and surrounding rules
+  content = content.replace(/\[Prev Chapter\].*?\[Next Chapter\].*$/gim, '');
+  content = content.replace(/^\*\s*\*\s*\*\s*$/gm, '');
+
+  // Remove Translator/Editor credit lines
+  content = content.replace(/^(?:Translator|Editor)\s*:\s*.+$/gim, '');
+
+  // Remove novelbin watermarks/branding
+  content = content.replace(/^.*(?:novelbin|novel\s*bin).*$/gim, '');
+
+  // Remove "Reading" / "Plan to Read" / list links
+  content = content.replace(/^\[(?:Reading|Plan to Read|Completed|Dropped)\].*$/gim, '');
+
+  // Remove rating lines
+  content = content.replace(/^_\*\*\d+\.?\d*\*\*_\s*$/gm, '');
+  content = content.replace(/^_\/?_\s*$/gm, '');
+  content = content.replace(/^_\d+_\s*$/gm, '');
+  content = content.replace(/^_\*\*ratings?\*\*_\s*$/gim, '');
+
+  // Remove "Novel info" / "## Novel info" sections
+  content = content.replace(/^#{1,6}\s*Novel\s*info\s*$/gim, '');
+
+  // Remove site footer / recommendation sections
+  content = content.replace(/^.*(?:Terms of Service|Privacy Policy|DMCA|Copyright|Contact Us).*$/gim, '');
+
+  // Remove image links to other novels at the bottom
+  content = content.replace(/\[!\[.*?\]\(https?:\/\/images\.novelbin.*?\)\\\\/gim, '');
 
   return content;
 }
