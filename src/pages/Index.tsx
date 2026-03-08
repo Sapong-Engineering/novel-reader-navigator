@@ -33,6 +33,16 @@ const Index = () => {
   const [isSyncing, setIsSyncing] = useState(false);
   const [isOnline, setIsOnline] = useState(navigator.onLine);
   const appSettings = useAppSettings();
+  const [isAdmin, setIsAdmin] = useState(false);
+
+  // Check admin role
+  useEffect(() => {
+    if (!user) { setIsAdmin(false); return; }
+    import('@/integrations/supabase/client').then(({ supabase }) => {
+      supabase.from('user_roles').select('role').eq('user_id', user.id).eq('role', 'admin').maybeSingle()
+        .then(({ data }) => setIsAdmin(!!data));
+    });
+  }, [user]);
 
   // Track online/offline status
   useEffect(() => {
