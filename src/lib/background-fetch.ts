@@ -86,7 +86,7 @@ export async function startFetchAll(
       syncChapterToBackend(novel.id, updated);
     },
     (completed, total) => {
-      _progress = { ..._progress, current: completed, total };
+      _progress = { ..._progress, current: completed, total, fetchedChapters: alreadyFetched + completed };
       emit();
     },
   );

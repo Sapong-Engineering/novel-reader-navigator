@@ -17,7 +17,7 @@ const BackgroundFetchBanner = () => {
 
   if (!state.isFetching) return null;
 
-  const { current, total, novelTitle, novelId } = state.progress;
+  const { current, total, totalChapters, fetchedChapters, novelTitle, novelId } = state.progress;
   const pct = total ? (current / total) * 100 : 0;
 
   return (
@@ -28,9 +28,14 @@ const BackgroundFetchBanner = () => {
           onClick={() => navigate(`/reader/${novelId}`)}
           className="text-sm font-sans-ui text-foreground hover:underline truncate block text-left"
         >
-          Fetching "{novelTitle}" — {current}/{total} chapters
+          Fetching "{novelTitle}" — {current}/{total} remaining
         </button>
-        <Progress value={pct} className="h-1 mt-1" />
+        <div className="flex items-center gap-2 mt-1">
+          <Progress value={pct} className="h-1 flex-1" />
+          <span className="text-xs text-muted-foreground font-sans-ui whitespace-nowrap">
+            {fetchedChapters}/{totalChapters} synced
+          </span>
+        </div>
       </div>
       <Button variant="ghost" size="icon" className="h-7 w-7 flex-shrink-0" onClick={cancelFetchAll} aria-label="Cancel fetch">
         <X className="w-3.5 h-3.5" />
