@@ -353,6 +353,7 @@ export async function syncNovel(novel: Novel): Promise<void> {
 }
 
 export async function syncDeleteNovel(localId: string): Promise<void> {
+  if (!isSyncEnabled()) return;
   if (!navigator.onLine) {
     enqueue('deleteNovel', { localId });
     setSyncStatus('idle');
