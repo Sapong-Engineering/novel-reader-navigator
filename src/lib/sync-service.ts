@@ -5,6 +5,7 @@ import { getReadingProgress, saveReadingProgress, getLastReadChapter, saveLastRe
 import { setSyncStatus } from '@/hooks/useSyncStatus';
 import { enqueue, dequeue, getQueueLength, onConnectivityChange } from './offline-queue';
 import { compareChapterOrder, orderChapters } from './chapter-order';
+import { isSyncEnabled } from './notify';
 // ── Caches ──
 
 let cachedUserId: string | null = null;
