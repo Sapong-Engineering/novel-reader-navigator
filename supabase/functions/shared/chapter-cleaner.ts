@@ -8,6 +8,8 @@ export function cleanChapterContent(markdown: string, url: string): string {
   // ── Site-specific cleaning ──────────────────────────────────
   if (/wuxia\.click/i.test(url)) {
     content = cleanWuxiaClick(content);
+  } else if (/novelbin\.(?:com|net|me)/i.test(url)) {
+    content = cleanNovelBin(content);
   } else if (/empirenovel\.com/i.test(url)) {
     content = cleanEmpireNovel(content);
   }
