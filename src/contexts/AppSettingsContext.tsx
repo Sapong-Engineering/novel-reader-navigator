@@ -25,6 +25,7 @@ const DEFAULTS: AppSettings = {
   notificationsEnabled: true,
   notifyNewChapters: true,
   autoFetchNewChapters: false,
+  refreshIntervalHours: 24,
 };
 
 function load(): AppSettings {
