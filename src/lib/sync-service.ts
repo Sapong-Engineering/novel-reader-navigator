@@ -182,15 +182,11 @@ export async function syncLibraryFromBackend(): Promise<Novel[]> {
 
   try {
     // Fetch novels and chapter METADATA only (skip content for speed)
-    const [novelsRes, chaptersRes] = await Promise.all([
-      supabase.from('novels').select('*'),
-      supabase.from('chapters').select('id,novel_id,local_id,title,url,saved_at,sort_order'),
+    // Use paginated fetch to bypass the 1000-row default limit
+    const [remoteNovels, remoteChapters] = await Promise.all([
+      fetchAllRows<any>(() => supabase.from('novels').select('*')),
+      fetchAllRows<any>(() => supabase.from('chapters').select('id,novel_id,local_id,title,url,saved_at,sort_order')),
     ]);
-
-    if (novelsRes.error) throw novelsRes.error;
-
-    const remoteNovels = novelsRes.data ?? [];
-    const remoteChapters = chaptersRes.data ?? [];
 
     // Populate UUID cache
     for (const rn of remoteNovels) {
