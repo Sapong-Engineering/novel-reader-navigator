@@ -15,6 +15,7 @@ import { syncLibraryFromBackend, syncNovel, syncDeleteNovel } from '@/lib/sync-s
 import { useAuth } from '@/hooks/useAuth';
 import { BookOpen, LogOut, LogIn, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import SyncIndicator from '@/components/SyncIndicator';
 
 const Index = () => {
   const navigate = useNavigate();
