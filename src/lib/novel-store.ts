@@ -1,4 +1,5 @@
 // Local storage based novel store
+import { toast } from 'sonner';
 
 export interface Chapter {
   id: string;
@@ -20,6 +21,20 @@ export interface Novel {
 
 const STORAGE_KEY = 'novel-reader-library';
 
+function safePersist(key: string, data: string): boolean {
+  try {
+    localStorage.setItem(key, data);
+    return true;
+  } catch (e) {
+    if (e instanceof DOMException && e.name === 'QuotaExceededError') {
+      toast.error('Storage is full. Consider removing some novels to free up space.');
+    } else {
+      console.error('Failed to save to localStorage:', e);
+    }
+    return false;
+  }
+}
+
 export function getLibrary(): Novel[] {
   try {
     const data = localStorage.getItem(STORAGE_KEY);
@@ -37,7 +52,7 @@ export function saveNovel(novel: Novel): void {
   } else {
     library.push(novel);
   }
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(library));
+  safePersist(STORAGE_KEY, JSON.stringify(library));
 }
 
 export function getNovel(id: string): Novel | undefined {
@@ -46,9 +61,9 @@ export function getNovel(id: string): Novel | undefined {
 
 export function deleteNovel(id: string): void {
   const library = getLibrary().filter(n => n.id !== id);
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(library));
+  safePersist(STORAGE_KEY, JSON.stringify(library));
 }
 
 export function generateId(): string {
-  return Math.random().toString(36).substring(2, 10);
+  return crypto.randomUUID();
 }

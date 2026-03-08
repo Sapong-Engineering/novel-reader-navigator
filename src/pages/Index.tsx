@@ -102,7 +102,7 @@ const Index = () => {
   }, [signOut]);
 
   return (
-    <div className="min-h-screen bg-background">
+    <div id="main-content" className="min-h-screen bg-background">
       {/* Top bar */}
       <div className="flex items-center justify-end px-4 py-3 gap-2">
         <SyncIndicator />
