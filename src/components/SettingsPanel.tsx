@@ -17,6 +17,39 @@ interface SettingsPanelProps {
   onRepairChapterOrder?: () => void;
   trigger?: ReactNode;
 }
+function BrowserNotificationToggle() {
+  const appSettings = useAppSettings();
+  const [permState, setPermState] = useState<NotificationPermission>(getNotificationPermission);
+
+  const handleToggle = useCallback(async (checked: boolean) => {
+    if (checked && permState !== 'granted') {
+      const result = await requestNotificationPermission();
+      setPermState(result);
+      if (result !== 'granted') return;
+    }
+    appSettings.setBrowserNotificationsEnabled(checked);
+  }, [permState, appSettings]);
+
+  const denied = permState === 'denied';
+
+  return (
+    <div className="flex items-center justify-between">
+      <div>
+        <p className="text-sm font-sans-ui text-foreground flex items-center gap-1.5">
+          <BellRing className="w-3.5 h-3.5" /> Browser Alerts
+        </p>
+        <p className="text-xs text-muted-foreground font-sans-ui">
+          {denied ? 'Blocked by browser — enable in site settings' : 'Show OS notifications when tab is in background'}
+        </p>
+      </div>
+      <Switch
+        checked={appSettings.browserNotificationsEnabled && !denied}
+        onCheckedChange={handleToggle}
+        disabled={!appSettings.notificationsEnabled || denied}
+      />
+    </div>
+  );
+}
 
 const SettingsPanel = ({ onSync, onRepairChapterOrder, trigger }: SettingsPanelProps) => {
   const { theme, setTheme } = useThemeContext();
