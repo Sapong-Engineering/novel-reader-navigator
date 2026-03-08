@@ -203,15 +203,10 @@ const Reader = () => {
 
   const handleFetchAll = useCallback(async () => {
     if (!novel || isFetchingAll) return;
-    await fetchAll(novel, (updatedNovel) => {
+    await startFetchAll(novel, (updatedNovel) => {
       setNovel(updatedNovel);
-    }, (novelId, chapter) => {
-      syncChapterToBackend(novelId, chapter);
     });
-    // Final full sync after batch completes
-    const latest = getNovel(novelIdStr);
-    if (latest) syncNovel(latest);
-  }, [novel, isFetchingAll, fetchAll, novelIdStr]);
+  }, [novel, isFetchingAll]);
 
   const handleSave = useCallback(() => {
     if (novel) {
