@@ -9,6 +9,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import UserManagement from '@/components/admin/UserManagement';
 import ContentModeration from '@/components/admin/ContentModeration';
 import Analytics from '@/components/admin/Analytics';
+import AdminPreferences from '@/components/admin/AdminPreferences';
 
 const Admin = () => {
   const { user, loading: authLoading } = useAuth();
