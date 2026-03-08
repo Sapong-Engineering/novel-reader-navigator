@@ -342,7 +342,6 @@ export async function syncDeleteNovel(localId: string): Promise<void> {
     console.error('Failed to delete novel from backend:', err);
   }
 }
-}
 
 // ── On-demand chapter content from backend ──
 
