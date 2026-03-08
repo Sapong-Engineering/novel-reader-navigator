@@ -60,17 +60,22 @@ Deno.serve(async (req) => {
         else if (url.includes('wuxia.click')) source = 'WuxiaClick';
         else if (url.includes('empirenovel.com')) source = 'EmpireNovel';
 
-        // Filter out non-novel pages (chapter pages, search pages, etc.)
-        const isNovelPage = 
-          (source === 'NovelBin' && /\/b\/[^/]+$/.test(url)) ||
-          (source === 'WuxiaClick' && /\/book\/[^/]+$/.test(url)) ||
-          (source === 'EmpireNovel' && /\/book\/[^/]+$/.test(url));
+        if (source === 'unknown') return null;
 
-        if (!isNovelPage) return null;
+        // Exclude obvious non-novel pages
+        const isChapterPage = /chapter[-_\s]?\d/i.test(url) || /\/chapter\//i.test(url);
+        const isUtilityPage = /\/(search|category|tag|login|register|contact|about|faq)\b/i.test(url);
+        const isListPage = /\/novels-list/i.test(url) || /[?&]author=/i.test(url) || /[?&]category=/i.test(url);
+        if (isChapterPage || isUtilityPage || isListPage) return null;
+
+        // Clean pagination from URLs
+        const cleanUrl = url.replace(/\?page=\d+/, '');
 
         return {
-          title: (item.title || '').replace(/ - NovelBin| - WuxiaClick| - EmpireNovel|Read Online Free/gi, '').trim(),
-          url,
+          title: (item.title || '')
+            .replace(/ - NovelBin| - WuxiaClick| - EmpireNovel| - Read| Online Free| Novel Full| read online \| Empire Novel| Light Novels/gi, '')
+            .trim(),
+          url: cleanUrl,
           description: item.description || '',
           source,
         };
