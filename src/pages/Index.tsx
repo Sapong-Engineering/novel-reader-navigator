@@ -13,7 +13,7 @@ import {
 } from '@/lib/novel-store';
 import { syncLibraryFromBackend, syncNovel, syncDeleteNovel } from '@/lib/sync-service';
 import { useAuth } from '@/hooks/useAuth';
-import { BookOpen, LogOut, LogIn, Loader2 } from 'lucide-react';
+import { BookOpen, LogOut, LogIn, Loader2, WifiOff } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import SyncIndicator from '@/components/SyncIndicator';
 
