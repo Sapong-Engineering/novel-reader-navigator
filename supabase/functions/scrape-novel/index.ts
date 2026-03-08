@@ -1,6 +1,7 @@
 import { AdapterRegistry } from './adapters/types.ts';
 import { DefaultAdapter } from './adapters/default-adapter.ts';
 import { WuxiaClickAdapter } from './adapters/wuxiaclick-adapter.ts';
+import { NovelBinAdapter } from './adapters/novelbin-adapter.ts';
 import { novelInfoCache, Cache } from '../shared/cache.ts';
 
 const corsHeaders = {
