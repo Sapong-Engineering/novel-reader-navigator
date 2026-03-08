@@ -9,6 +9,8 @@ import { notify } from '@/lib/notify';
 export interface FetchProgress {
   current: number;
   total: number;
+  totalChapters: number;
+  fetchedChapters: number;
   currentTitle?: string;
   novelId: string;
   novelTitle: string;
