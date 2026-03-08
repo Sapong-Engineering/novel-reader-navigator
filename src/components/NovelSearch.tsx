@@ -1,9 +1,9 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { Search, Loader2, Plus, Globe } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { searchNovels, type SearchResult } from '@/lib/api/firecrawl';
+import { searchNovels, getActiveSources, type SearchResult, type ActiveSource } from '@/lib/api/firecrawl';
 import { toast } from 'sonner';
 
 interface NovelSearchProps {
