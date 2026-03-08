@@ -91,6 +91,7 @@ async function _syncProgressToBackend(
       }, { onConflict: 'user_id,novel_id,chapter_local_id' });
   } catch (err) {
     console.error('Failed to sync progress:', err);
+    enqueue('syncProgress', { novelLocalId, chapterLocalId, scrollPosition, isLastRead });
   }
 }
 
