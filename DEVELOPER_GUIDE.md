@@ -15,7 +15,10 @@
 6. [React Hooks Reference](#6-react-hooks-reference)
 7. [Context Providers](#7-context-providers)
 8. [Feature Map](#8-feature-map)
-9. [Troubleshooting Guide](#9-troubleshooting-guide)
+9. [Security & Sanitization](#9-security--sanitization)
+10. [PWA Configuration](#10-pwa-configuration)
+11. [Error Handling](#11-error-handling)
+12. [Troubleshooting Guide](#12-troubleshooting-guide)
 
 ---
 
