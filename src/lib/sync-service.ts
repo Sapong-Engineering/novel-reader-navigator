@@ -312,6 +312,7 @@ export async function syncNovel(novel: Novel): Promise<void> {
 export async function syncDeleteNovel(localId: string): Promise<void> {
   const userId = await getUserId();
   if (!userId) return;
+  setSyncStatus('syncing');
   try {
     novelUuidCache.delete(localId);
     await supabase
@@ -319,7 +320,9 @@ export async function syncDeleteNovel(localId: string): Promise<void> {
       .delete()
       .eq('local_id', localId)
       .eq('user_id', userId);
+    setSyncStatus('done');
   } catch (err) {
+    setSyncStatus('error');
     console.error('Failed to delete novel from backend:', err);
   }
 }
