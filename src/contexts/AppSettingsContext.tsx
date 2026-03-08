@@ -30,6 +30,8 @@ const DEFAULTS: AppSettings = {
   notifyNewChapters: true,
   autoFetchNewChapters: false,
   refreshIntervalHours: 24,
+  soundEnabled: true,
+  browserNotificationsEnabled: false,
 };
 
 function load(): AppSettings {
