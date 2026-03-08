@@ -6,6 +6,7 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import Index from "./pages/Index";
 import Reader from "./pages/Reader";
 import Auth from "./pages/Auth";
+import Admin from "./pages/Admin";
 import NotFound from "./pages/NotFound";
 import ErrorBoundary from "./components/ErrorBoundary";
 import SyncErrorBanner from "./components/SyncErrorBanner";
@@ -27,8 +28,9 @@ const App = () => (
               <SyncErrorBanner />
               <BrowserRouter>
                 <Routes>
-                  <Route path="/" element={<Index />} />
+                <Route path="/" element={<Index />} />
                   <Route path="/auth" element={<Auth />} />
+                  <Route path="/admin" element={<Admin />} />
                   <Route path="/reader/:novelId" element={<Reader />} />
                   <Route path="*" element={<NotFound />} />
                 </Routes>

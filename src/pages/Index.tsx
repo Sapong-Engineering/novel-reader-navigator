@@ -14,7 +14,9 @@ import {
 import { syncLibraryFromBackend, syncNovel, syncDeleteNovel } from '@/lib/sync-service';
 import { orderChapters } from '@/lib/chapter-order';
 import { useAuth } from '@/hooks/useAuth';
-import { BookOpen, LogOut, LogIn, Loader2, WifiOff, RefreshCw } from 'lucide-react';
+import { BookOpen, LogOut, LogIn, Loader2, WifiOff, RefreshCw, Shield, Search as SearchIcon, Link as LinkIcon } from 'lucide-react';
+import NovelSearch from '@/components/NovelSearch';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
 import SyncIndicator from '@/components/SyncIndicator';
 import SettingsPanel from '@/components/SettingsPanel';
@@ -31,6 +33,16 @@ const Index = () => {
   const [isSyncing, setIsSyncing] = useState(false);
   const [isOnline, setIsOnline] = useState(navigator.onLine);
   const appSettings = useAppSettings();
+  const [isAdmin, setIsAdmin] = useState(false);
+
+  // Check admin role
+  useEffect(() => {
+    if (!user) { setIsAdmin(false); return; }
+    import('@/integrations/supabase/client').then(({ supabase }) => {
+      supabase.from('user_roles').select('role').eq('user_id', user.id).eq('role', 'admin').maybeSingle()
+        .then(({ data }) => setIsAdmin(!!data));
+    });
+  }, [user]);
 
   // Track online/offline status
   useEffect(() => {
@@ -154,6 +166,11 @@ const Index = () => {
         <SettingsPanel onSync={user ? handleManualSync : undefined} />
         {authLoading ? null : user ? (
           <>
+            {isAdmin && (
+              <Button variant="ghost" size="sm" onClick={() => navigate('/admin')}>
+                <Shield className="w-4 h-4 mr-1" /> Admin
+              </Button>
+            )}
             <span className="text-xs text-muted-foreground truncate max-w-[200px]">{user.email}</span>
             <Button variant="ghost" size="sm" onClick={handleSignOut}>
               <LogOut className="w-4 h-4 mr-1" /> Sign Out
@@ -179,9 +196,26 @@ const Index = () => {
         </div>
       )}
 
-      {/* Hero Section */}
+      {/* Hero Section — Paste URL or Search */}
       <div className="flex items-center justify-center px-4 py-12 sm:py-20">
-        <NovelUrlInput onSubmit={handleFetchNovel} isLoading={isLoadingNovel} />
+        <div className="w-full max-w-2xl">
+          <Tabs defaultValue="url" className="w-full">
+            <TabsList className="w-full mb-4">
+              <TabsTrigger value="url" className="flex-1 gap-1.5">
+                <LinkIcon className="w-3.5 h-3.5" /> Paste URL
+              </TabsTrigger>
+              <TabsTrigger value="search" className="flex-1 gap-1.5">
+                <SearchIcon className="w-3.5 h-3.5" /> Search Novels
+              </TabsTrigger>
+            </TabsList>
+            <TabsContent value="url">
+              <NovelUrlInput onSubmit={handleFetchNovel} isLoading={isLoadingNovel} />
+            </TabsContent>
+            <TabsContent value="search">
+              <NovelSearch onAddNovel={handleFetchNovel} isAddingNovel={isLoadingNovel} />
+            </TabsContent>
+          </Tabs>
+        </div>
       </div>
 
       {/* Library Section */}
