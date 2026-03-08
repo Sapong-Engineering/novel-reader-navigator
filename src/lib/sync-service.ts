@@ -465,6 +465,64 @@ export async function syncChapterToBackend(novelLocalId: string, chapter: Chapte
   }
 }
 
+// ── Sync full novel from backend (with chapter content) ──
+
+export async function syncFullNovelFromBackend(novelLocalId: string): Promise<Novel | null> {
+  const userId = await getUserId();
+  if (!userId) return null;
+  try {
+    const novelUuid = await resolveNovelUuid(novelLocalId, userId);
+    if (!novelUuid) return null;
+
+    const [novelRes, chaptersRes] = await Promise.all([
+      supabase.from('novels').select('*').eq('id', novelUuid).single(),
+      supabase.from('chapters').select('*').eq('novel_id', novelUuid).order('sort_order'),
+    ]);
+
+    if (novelRes.error || !novelRes.data) return null;
+
+    const rn = novelRes.data;
+    const remoteChapters = chaptersRes.data ?? [];
+
+    const localNovel = getNovel(novelLocalId);
+
+    const chapters: Chapter[] = remoteChapters.map(c => {
+      const localCh = localNovel?.chapters.find(lc => lc.id === c.local_id);
+      return {
+        id: c.local_id,
+        title: c.title,
+        url: c.url,
+        content: localCh?.content ?? c.content ?? undefined,
+        savedAt: c.saved_at ?? undefined,
+      };
+    });
+
+    // Append any local-only chapters
+    if (localNovel) {
+      const remoteIds = new Set(remoteChapters.map(c => c.local_id));
+      for (const lc of localNovel.chapters) {
+        if (!remoteIds.has(lc.id)) chapters.push(lc);
+      }
+    }
+
+    const novel: Novel = {
+      id: rn.local_id,
+      title: rn.title,
+      url: rn.url,
+      coverUrl: rn.cover_url ?? undefined,
+      description: rn.description ?? undefined,
+      savedAt: rn.saved_at,
+      chapters,
+    };
+
+    saveNovel(novel);
+    return novel;
+  } catch (err) {
+    console.error('[sync] Failed to fetch full novel from backend:', err);
+    return null;
+  }
+}
+
 // ── Offline queue replay ──
 
 let isReplaying = false;
