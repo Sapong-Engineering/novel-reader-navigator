@@ -166,6 +166,11 @@ const Index = () => {
         <SettingsPanel onSync={user ? handleManualSync : undefined} />
         {authLoading ? null : user ? (
           <>
+            {isAdmin && (
+              <Button variant="ghost" size="sm" onClick={() => navigate('/admin')}>
+                <Shield className="w-4 h-4 mr-1" /> Admin
+              </Button>
+            )}
             <span className="text-xs text-muted-foreground truncate max-w-[200px]">{user.email}</span>
             <Button variant="ghost" size="sm" onClick={handleSignOut}>
               <LogOut className="w-4 h-4 mr-1" /> Sign Out
