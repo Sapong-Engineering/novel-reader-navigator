@@ -14,6 +14,7 @@ export interface AppSettingsContextValue extends AppSettings {
   setNotificationsEnabled: (v: boolean) => void;
   setNotifyNewChapters: (v: boolean) => void;
   setAutoFetchNewChapters: (v: boolean) => void;
+  setRefreshIntervalHours: (v: number) => void;
   resetAll: () => void;
 }
 
