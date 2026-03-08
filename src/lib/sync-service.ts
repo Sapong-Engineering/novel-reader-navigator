@@ -161,7 +161,7 @@ export async function syncLibraryFromBackend(): Promise<Novel[]> {
     // Fetch novels and chapter METADATA only (skip content for speed)
     const [novelsRes, chaptersRes] = await Promise.all([
       supabase.from('novels').select('*'),
-      supabase.from('chapters').select('id,novel_id,local_id,title,url,saved_at'),
+      supabase.from('chapters').select('id,novel_id,local_id,title,url,saved_at,sort_order'),
     ]);
 
     if (novelsRes.error) throw novelsRes.error;
