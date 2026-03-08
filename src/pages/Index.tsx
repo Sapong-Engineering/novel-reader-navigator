@@ -196,9 +196,26 @@ const Index = () => {
         </div>
       )}
 
-      {/* Hero Section */}
+      {/* Hero Section — Paste URL or Search */}
       <div className="flex items-center justify-center px-4 py-12 sm:py-20">
-        <NovelUrlInput onSubmit={handleFetchNovel} isLoading={isLoadingNovel} />
+        <div className="w-full max-w-2xl">
+          <Tabs defaultValue="url" className="w-full">
+            <TabsList className="w-full mb-4">
+              <TabsTrigger value="url" className="flex-1 gap-1.5">
+                <LinkIcon className="w-3.5 h-3.5" /> Paste URL
+              </TabsTrigger>
+              <TabsTrigger value="search" className="flex-1 gap-1.5">
+                <SearchIcon className="w-3.5 h-3.5" /> Search Novels
+              </TabsTrigger>
+            </TabsList>
+            <TabsContent value="url">
+              <NovelUrlInput onSubmit={handleFetchNovel} isLoading={isLoadingNovel} />
+            </TabsContent>
+            <TabsContent value="search">
+              <NovelSearch onAddNovel={handleFetchNovel} isAddingNovel={isLoadingNovel} />
+            </TabsContent>
+          </Tabs>
+        </div>
       </div>
 
       {/* Library Section */}
