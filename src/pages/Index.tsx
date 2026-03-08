@@ -12,6 +12,7 @@ import {
   generateId,
 } from '@/lib/novel-store';
 import { syncLibraryFromBackend, syncNovel, syncDeleteNovel } from '@/lib/sync-service';
+import { orderChapters } from '@/lib/chapter-order';
 import { useAuth } from '@/hooks/useAuth';
 import { BookOpen, LogOut, LogIn, Loader2, WifiOff } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -78,11 +79,11 @@ const Index = () => {
         url,
         coverUrl: info.coverUrl,
         description: info.description,
-        chapters: info.chapters.map(ch => ({
+        chapters: orderChapters(info.chapters.map(ch => ({
           id: ch.id,
           title: ch.title,
           url: ch.url,
-        })),
+        }))),
         savedAt: new Date().toISOString(),
       };
       saveNovel(newNovel);

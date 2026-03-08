@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect, useRef } from 'react';
+import { useState, useCallback, useEffect, useRef, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import ChapterList from '@/components/ChapterList';
@@ -15,6 +15,7 @@ import { useReadingProgress } from '@/hooks/useReadingProgress';
 import { useBookmarks } from '@/hooks/useBookmarks';
 import { validateUrl } from '@/lib/validation';
 import { scrapeChapterContent } from '@/lib/api/firecrawl';
+import { orderChapters } from '@/lib/chapter-order';
 
 const Reader = () => {
   const { novelId } = useParams<{ novelId: string }>();
@@ -32,8 +33,10 @@ const Reader = () => {
     handleSelectChapter(chapter);
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
+  const orderedChapters = useMemo(() => orderChapters(novel?.chapters ?? []), [novel?.chapters]);
+
   const { hasPrev, hasNext, goToPrev, goToNext } = useChapterNavigation(
-    novel?.chapters ?? [],
+    orderedChapters,
     activeChapter,
     handleNavSelectChapter,
   );
@@ -223,7 +226,7 @@ const Reader = () => {
     <div className="h-screen flex flex-col bg-background">
       <NovelToolbar
         title={novel.title}
-        chapterCount={novel.chapters.length}
+        chapterCount={orderedChapters.length}
         savedCount={savedCount}
         onExportPdf={handleExportPdf}
         onExportDocx={handleExportDocx}
@@ -235,7 +238,7 @@ const Reader = () => {
         showReaderSettings
         mobileChapterDrawer={
           <MobileChapterDrawer
-            chapters={novel.chapters}
+            chapters={orderedChapters}
             activeChapterId={activeChapter?.id}
             onSelectChapter={handleSelectChapter}
             bookmarks={bookmarks}
@@ -249,7 +252,7 @@ const Reader = () => {
         <div className="w-72 border-r border-border bg-card flex-shrink-0 hidden md:flex flex-col">
           <ErrorBoundary>
             <ChapterList
-              chapters={novel.chapters}
+              chapters={orderedChapters}
               activeChapterId={activeChapter?.id}
               onSelectChapter={handleSelectChapter}
               bookmarks={bookmarks}

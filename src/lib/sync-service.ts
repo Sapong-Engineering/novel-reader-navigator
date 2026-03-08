@@ -4,7 +4,7 @@ import { getBookmarks, type Bookmark } from './bookmarks';
 import { getReadingProgress, saveReadingProgress, getLastReadChapter, saveLastReadChapter } from './storage-manager';
 import { setSyncStatus } from '@/hooks/useSyncStatus';
 import { enqueue, dequeue, getQueueLength, onConnectivityChange } from './offline-queue';
-
+import { compareChapterOrder, orderChapters } from './chapter-order';
 // ── Caches ──
 
 let cachedUserId: string | null = null;
@@ -198,8 +198,16 @@ export async function syncLibraryFromBackend(): Promise<Novel[]> {
     for (const rn of remoteNovels) {
       seenLocalIds.add(rn.local_id);
       const rawChapters = chaptersByNovelId.get(rn.id) ?? [];
-      // Sort by sort_order from backend to restore original scrape order
-      rawChapters.sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0));
+      // Primary order from backend sort_order, with natural chapter-order tie-breaks
+      rawChapters.sort((a, b) => {
+        const sortDiff = (a.sort_order ?? 0) - (b.sort_order ?? 0);
+        if (sortDiff !== 0) return sortDiff;
+        return compareChapterOrder(
+          { id: a.local_id, title: a.title, url: a.url },
+          { id: b.local_id, title: b.title, url: b.url },
+        );
+      });
+
       const chapters = rawChapters.map(c => ({
         id: c.local_id,
         title: c.title,
@@ -255,26 +263,27 @@ export async function syncLibraryFromBackend(): Promise<Novel[]> {
 }
 
 function mergeChapters(local: Chapter[], remote: Chapter[]): Chapter[] {
-  // Use local order as the canonical order (preserves scrape order)
-  // If local is empty, use remote order
-  if (local.length === 0) return remote;
+  // Backend order is canonical once we have synced metadata.
+  // Keep local chapter content/savedAt when present, then append local-only chapters.
+  if (remote.length === 0) return local;
 
-  const remoteMap = new Map<string, Chapter>();
-  for (const ch of remote) remoteMap.set(ch.id, ch);
+  const localById = new Map(local.map(ch => [ch.id, ch]));
 
-  // Start with local order, enriching with remote metadata
-  const merged = local.map(ch => {
-    const remoteCh = remoteMap.get(ch.id);
-    // Keep local content if present, otherwise use remote
-    if (ch.content) return ch;
-    if (remoteCh) return { ...remoteCh, content: ch.content };
-    return ch;
+  const merged = remote.map(remoteCh => {
+    const localCh = localById.get(remoteCh.id);
+    if (!localCh) return remoteCh;
+
+    return {
+      ...remoteCh,
+      content: localCh.content ?? remoteCh.content,
+      savedAt: localCh.savedAt ?? remoteCh.savedAt,
+    };
   });
 
-  // Add any remote-only chapters at the end
-  for (const ch of remote) {
-    if (!local.some(l => l.id === ch.id)) {
-      merged.push(ch);
+  const remoteIds = new Set(remote.map(ch => ch.id));
+  for (const localCh of local) {
+    if (!remoteIds.has(localCh.id)) {
+      merged.push(localCh);
     }
   }
 
@@ -298,8 +307,9 @@ async function upsertNovelToBackend(novel: Novel, userId: string): Promise<void>
     .eq('id', novelUuid);
 
   // Batch upsert ALL chapters (metadata for all, content for those that have it)
-  // sort_order = array index preserves original scrape order
-  const allChaptersData = novel.chapters.map((ch, index) => ({
+  // sort_order uses chapter order so it stays stable across sessions/devices.
+  const orderedChapters = orderChapters(novel.chapters);
+  const allChaptersData = orderedChapters.map((ch, index) => ({
     novel_id: novelUuid,
     user_id: userId,
     local_id: ch.id,
