@@ -11,6 +11,7 @@ import ErrorBoundary from "./components/ErrorBoundary";
 import SyncErrorBanner from "./components/SyncErrorBanner";
 import { ThemeProvider } from "./contexts/ThemeContext";
 import { ReaderProvider } from "./contexts/ReaderContext";
+import { AppSettingsProvider } from "./contexts/AppSettingsContext";
 
 const queryClient = new QueryClient();
 
