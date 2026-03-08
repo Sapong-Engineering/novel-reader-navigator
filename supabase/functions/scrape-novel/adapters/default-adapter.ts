@@ -58,6 +58,13 @@ export class DefaultAdapter implements SiteAdapter {
       if (n > maxChapter) maxChapter = n;
     }
 
+    // Also check for "N Chapters" text pattern
+    const chapterCountMatch = markdown.match(/(\d[\d,]*)\s*Chapters?/i);
+    if (chapterCountMatch) {
+      const n = parseInt(chapterCountMatch[1].replace(/,/g, ''), 10);
+      if (n > maxChapter) maxChapter = n;
+    }
+
     const cleanBase = baseUrl.replace(/\/$/, '');
     const chapters: ChapterInfo[] = [];
     for (let i = 1; i <= maxChapter; i++) {
