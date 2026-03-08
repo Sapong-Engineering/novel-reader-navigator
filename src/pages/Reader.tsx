@@ -6,12 +6,16 @@ import ReaderView from '@/components/ReaderView';
 import NovelToolbar from '@/components/NovelToolbar';
 import MobileChapterDrawer from '@/components/MobileChapterDrawer';
 import ErrorBoundary from '@/components/ErrorBoundary';
+import ImmersiveOverlay from '@/components/reader/ImmersiveOverlay';
 import { type Novel, type Chapter, saveNovel, getNovel } from '@/lib/novel-store';
 import { syncNovel, syncBookmarksToBackend, syncProgressToBackend, fetchChapterContentFromBackend, syncFullNovelFromBackend } from '@/lib/sync-service';
 import { exportToPdfWithProgress, exportToDocxWithProgress } from '@/lib/export-service';
 import { useChapterNavigation } from '@/hooks/useChapterNavigation';
 import { useReadingProgress } from '@/hooks/useReadingProgress';
 import { useBookmarks } from '@/hooks/useBookmarks';
+import { useImmersiveMode } from '@/hooks/useImmersiveMode';
+import { useReadingStats } from '@/hooks/useReadingStats';
+import { useTTS } from '@/hooks/useTTS';
 import { validateUrl } from '@/lib/validation';
 import { scrapeChapterContent } from '@/lib/api/firecrawl';
 import { orderChapters } from '@/lib/chapter-order';
@@ -28,8 +32,11 @@ const Reader = () => {
   const forceScrollTopRef = useRef(false);
 
   const appSettings = useAppSettings();
+  const immersive = useImmersiveMode();
+  const isReading = Boolean(activeChapter?.content && !isLoadingChapter);
+  const { recordChapterRead } = useReadingStats(isReading);
 
-  // Background fetch state — subscribe to global singleton
+  // Background fetch state
   const [fetchState, setFetchState] = useState(getFetchAllState);
   useEffect(() => subscribeFetchAll(() => {
     setFetchState(getFetchAllState());
@@ -54,6 +61,16 @@ const Reader = () => {
     activeChapter,
     handleNavSelectChapter,
   );
+
+  // TTS with auto-advance to next chapter
+  const tts = useTTS(hasNext ? goToNext : undefined);
+
+  // Set TTS paragraphs when chapter changes
+  useEffect(() => {
+    if (activeChapter?.content) {
+      tts.setParagraphs(activeChapter.content);
+    }
+  }, [activeChapter?.id, activeChapter?.content]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const novelIdStr = novelId ?? '';
   const { saveProgress, restoreProgress, getLastRead } = useReadingProgress(
@@ -86,13 +103,11 @@ const Reader = () => {
       return;
     }
 
-    // Sync from backend to pick up new chapters (cron-discovered or from other devices)
     if (!appSettings.syncEnabled) return;
     syncFullNovelFromBackend(novelId).then(synced => {
       if (synced) {
         setNovel(prev => {
           if (!prev) return synced;
-          // Merge: keep local content, add new remote chapters
           const localById = new Map(prev.chapters.map(c => [c.id, c]));
           const merged = synced.chapters.map(sc => {
             const local = localById.get(sc.id);
@@ -111,7 +126,15 @@ const Reader = () => {
   }, [novelId, navigate, appSettings.syncEnabled]); // eslint-disable-line react-hooks/exhaustive-deps
 
   async function handleSelectChapter(chapter: Chapter) {
+    // Stop TTS when changing chapters
+    tts.stop();
+
     if (chapter.content) {
+      // Record previous chapter as read
+      if (activeChapter?.content) {
+        const wordCount = activeChapter.content.split(/\s+/).length;
+        recordChapterRead(wordCount);
+      }
       setActiveChapter(chapter);
       syncProgressToBackend(novelIdStr, chapter.id, 0, true);
       return;
@@ -127,7 +150,6 @@ const Reader = () => {
     }
 
     try {
-      // Try backend first, then scrape as fallback
       let content = await fetchChapterContentFromBackend(novelIdStr, chapter.id);
       if (!content) {
         content = await scrapeChapterContent(chapter.url);
@@ -197,7 +219,7 @@ const Reader = () => {
     (scrollPosition: number, label?: string) => {
       if (!activeChapter) return;
       addChapterBookmark(activeChapter, scrollPosition, label);
-      syncBookmarksToBackend(novelIdStr); // sync after add
+      syncBookmarksToBackend(novelIdStr);
       toast.success(label ? `Bookmarked: "${label}"` : 'Bookmark added');
     },
     [activeChapter, addChapterBookmark, novelIdStr],
@@ -206,7 +228,7 @@ const Reader = () => {
   const handleRemoveBookmark = useCallback(
     (id: string) => {
       removeBookmark(id);
-      syncBookmarksToBackend(novelIdStr); // sync after remove
+      syncBookmarksToBackend(novelIdStr);
       toast.success('Bookmark removed');
     },
     [removeBookmark, novelIdStr],
@@ -281,35 +303,41 @@ const Reader = () => {
   const bookmarkedChapterIds = new Set(bookmarks.map(b => b.chapterId));
 
   return (
-    <div className="h-screen flex flex-col bg-background">
-      <NovelToolbar
-        title={novel.title}
-        chapterCount={orderedChapters.length}
-        savedCount={savedCount}
-        onExportPdf={handleExportPdf}
-        onExportDocx={handleExportDocx}
-        onSave={handleSave}
-        onBack={() => navigate('/')}
-        onFetchAll={handleFetchAll}
-        isFetchingAll={isFetchingAll}
-        fetchProgress={fetchProgress}
-        onSync={handleManualSync}
-        onRepairChapterOrder={handleRepairChapterOrder}
-        showReaderSettings
-        mobileChapterDrawer={
-          <MobileChapterDrawer
-            chapters={orderedChapters}
-            activeChapterId={activeChapter?.id}
-            onSelectChapter={handleSelectChapter}
-            bookmarks={bookmarks}
-            onJumpToBookmark={handleJumpToBookmark}
-            onRemoveBookmark={handleRemoveBookmark}
-            bookmarkedChapterIds={bookmarkedChapterIds}
-          />
-        }
-      />
+    <div
+      className={`h-screen flex flex-col bg-background ${immersive.isImmersive ? 'reader-immersive' : ''}`}
+      onClick={immersive.isImmersive ? immersive.showControls : undefined}
+    >
+      <div className={`transition-all duration-500 ${immersive.isImmersive ? 'opacity-0 h-0 overflow-hidden pointer-events-none' : 'opacity-100'}`}>
+        <NovelToolbar
+          title={novel.title}
+          chapterCount={orderedChapters.length}
+          savedCount={savedCount}
+          onExportPdf={handleExportPdf}
+          onExportDocx={handleExportDocx}
+          onSave={handleSave}
+          onBack={() => navigate('/')}
+          onFetchAll={handleFetchAll}
+          isFetchingAll={isFetchingAll}
+          fetchProgress={fetchProgress}
+          onSync={handleManualSync}
+          onRepairChapterOrder={handleRepairChapterOrder}
+          showReaderSettings
+          onImmersiveMode={immersive.enter}
+          mobileChapterDrawer={
+            <MobileChapterDrawer
+              chapters={orderedChapters}
+              activeChapterId={activeChapter?.id}
+              onSelectChapter={handleSelectChapter}
+              bookmarks={bookmarks}
+              onJumpToBookmark={handleJumpToBookmark}
+              onRemoveBookmark={handleRemoveBookmark}
+              bookmarkedChapterIds={bookmarkedChapterIds}
+            />
+          }
+        />
+      </div>
       <div className="flex-1 flex overflow-hidden">
-        <div className="w-72 border-r border-border bg-card flex-shrink-0 hidden md:flex flex-col">
+        <div className={`w-72 border-r border-border bg-card flex-shrink-0 hidden md:flex flex-col transition-all duration-500 ${immersive.isImmersive ? '!hidden' : ''}`}>
           <ErrorBoundary>
             <ChapterList
               chapters={orderedChapters}
@@ -322,7 +350,7 @@ const Reader = () => {
             />
           </ErrorBoundary>
         </div>
-        <div className="flex-1">
+        <div className="flex-1 flex flex-col">
           <ErrorBoundary>
             <ReaderView
               chapter={activeChapter}
@@ -336,10 +364,25 @@ const Reader = () => {
               chapterBookmarks={chapterBookmarks}
               onAddBookmark={handleAddBookmark}
               onRemoveBookmark={handleRemoveBookmark}
+              ttsCurrentIndex={tts.isPlaying || tts.isPaused ? tts.currentIndex : -1}
+              isImmersive={immersive.isImmersive}
+              tts={tts}
             />
           </ErrorBoundary>
         </div>
       </div>
+
+      {/* Immersive overlay */}
+      {immersive.isImmersive && (
+        <ImmersiveOverlay
+          visible={immersive.controlsVisible}
+          ambientSound={immersive.ambientSound}
+          onSoundChange={immersive.setAmbientSound}
+          volume={immersive.volume}
+          onVolumeChange={immersive.setVolume}
+          onExit={immersive.exit}
+        />
+      )}
     </div>
   );
 };

@@ -229,3 +229,21 @@
   0%, 100% { opacity: 1; transform: scale(1); }
   50% { opacity: 0.5; transform: scale(0.95); }
 }
+
+/* ── TTS Active Paragraph Highlight ── */
+.tts-active-paragraph {
+  background-color: hsl(var(--primary) / 0.1);
+  border-left: 3px solid hsl(var(--primary));
+  padding-left: 0.75em;
+  margin-left: -0.75em;
+  border-radius: 0 4px 4px 0;
+}
+
+/* ── Immersive Mode ── */
+.reader-immersive {
+  cursor: none;
+}
+
+.reader-immersive:hover {
+  cursor: default;
+}

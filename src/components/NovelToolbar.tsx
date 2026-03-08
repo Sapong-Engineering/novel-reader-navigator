@@ -1,7 +1,7 @@
 import { ReactNode } from 'react';
 import { Button } from '@/components/ui/button';
 import SyncIndicator from '@/components/SyncIndicator';
-import { Download, FileText, Save, BookOpen, Loader2, CloudDownload, RefreshCw } from 'lucide-react';
+import { Download, FileText, Save, BookOpen, Loader2, CloudDownload, Maximize2 } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -28,6 +28,7 @@ interface NovelToolbarProps {
   showReaderSettings?: boolean;
   onSync?: () => void;
   onRepairChapterOrder?: () => void;
+  onImmersiveMode?: () => void;
 }
 
 const NovelToolbar = ({
@@ -45,6 +46,7 @@ const NovelToolbar = ({
   showReaderSettings = false,
   onSync,
   onRepairChapterOrder,
+  onImmersiveMode,
 }: NovelToolbarProps) => {
   const progressPercent = fetchProgress?.total ? (fetchProgress.current / fetchProgress.total) * 100 : 0;
 
@@ -89,6 +91,12 @@ const NovelToolbar = ({
 
         <SyncIndicator />
         <NotificationCenter />
+
+        {onImmersiveMode && (
+          <Button variant="ghost" size="icon" onClick={onImmersiveMode} title="Immersive mode" className="hidden sm:inline-flex">
+            <Maximize2 className="w-4 h-4" />
+          </Button>
+        )}
 
         {showReaderSettings && <ReaderSettingsPopover onRepairChapterOrder={onRepairChapterOrder} />}
 
@@ -147,6 +155,12 @@ const NovelToolbar = ({
               <DropdownMenuItem onClick={onFetchAll} disabled={isFetchingAll} className="font-sans-ui">
                 <CloudDownload className="w-4 h-4 mr-2" />
                 {isFetchingAll ? `Fetching ${fetchProgress?.current}/${fetchProgress?.total}` : 'Fetch All'}
+              </DropdownMenuItem>
+            )}
+            {onImmersiveMode && (
+              <DropdownMenuItem onClick={onImmersiveMode} className="font-sans-ui">
+                <Maximize2 className="w-4 h-4 mr-2" />
+                Immersive Mode
               </DropdownMenuItem>
             )}
           </DropdownMenuContent>
