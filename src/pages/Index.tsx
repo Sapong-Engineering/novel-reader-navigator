@@ -133,6 +133,16 @@ const Index = () => {
         )}
       </div>
 
+      {/* Offline banner */}
+      {!isOnline && (
+        <div role="status" aria-live="polite" className="mx-4 mb-2 flex items-center gap-2 px-4 py-2.5 rounded-lg bg-destructive/10 border border-destructive/20">
+          <WifiOff className="w-4 h-4 text-destructive flex-shrink-0" aria-hidden="true" />
+          <p className="text-sm font-sans-ui text-foreground">
+            You're offline. Your library is available from local cache. New novels can't be fetched until you reconnect.
+          </p>
+        </div>
+      )}
+
       {/* Hero Section */}
       <div className="flex items-center justify-center px-4 py-12 sm:py-20">
         <NovelUrlInput onSubmit={handleFetchNovel} isLoading={isLoadingNovel} />
