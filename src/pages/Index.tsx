@@ -23,6 +23,19 @@ const Index = () => {
   const [isLoadingNovel, setIsLoadingNovel] = useState(false);
   const [library, setLibrary] = useState<Novel[]>(() => getLibrary());
   const [isSyncing, setIsSyncing] = useState(false);
+  const [isOnline, setIsOnline] = useState(navigator.onLine);
+
+  // Track online/offline status
+  useEffect(() => {
+    const onOnline = () => { setIsOnline(true); toast.success('Back online'); };
+    const onOffline = () => { setIsOnline(false); };
+    window.addEventListener('online', onOnline);
+    window.addEventListener('offline', onOffline);
+    return () => {
+      window.removeEventListener('online', onOnline);
+      window.removeEventListener('offline', onOffline);
+    };
+  }, []);
 
   // Sync library from backend when authenticated (guarded against double-fire)
   const syncedRef = useRef(false);
