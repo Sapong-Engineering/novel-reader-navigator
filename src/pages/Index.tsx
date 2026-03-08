@@ -134,6 +134,11 @@ const Index = () => {
     <div id="main-content" className="min-h-screen bg-background">
       {/* Top bar */}
       <div className="flex items-center justify-end px-4 py-3 gap-2">
+        {user && (
+          <Button variant="ghost" size="icon" onClick={handleManualSync} disabled={isSyncing} aria-label="Sync library">
+            <RefreshCw className={`w-4 h-4 ${isSyncing ? 'animate-spin' : ''}`} />
+          </Button>
+        )}
         <SyncIndicator />
         {authLoading ? null : user ? (
           <>
