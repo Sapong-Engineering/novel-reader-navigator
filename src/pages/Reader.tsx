@@ -11,7 +11,6 @@ import { syncNovel, syncBookmarksToBackend, syncProgressToBackend, fetchChapterC
 import { exportToPdfWithProgress, exportToDocxWithProgress } from '@/lib/export-service';
 import { useChapterNavigation } from '@/hooks/useChapterNavigation';
 import { useReadingProgress } from '@/hooks/useReadingProgress';
-import { useReadingProgress } from '@/hooks/useReadingProgress';
 import { useBookmarks } from '@/hooks/useBookmarks';
 import { validateUrl } from '@/lib/validation';
 import { scrapeChapterContent } from '@/lib/api/firecrawl';
