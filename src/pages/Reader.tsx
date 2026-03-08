@@ -27,8 +27,20 @@ const Reader = () => {
   const pendingScrollRef = useRef<number | null>(null);
   const forceScrollTopRef = useRef(false);
 
-  const { isFetching: isFetchingAll, progress: fetchProgress, fetchAll } = useChapterFetcher();
   const appSettings = useAppSettings();
+
+  // Background fetch state — subscribe to global singleton
+  const [fetchState, setFetchState] = useState(getFetchAllState);
+  useEffect(() => subscribeFetchAll(() => {
+    setFetchState(getFetchAllState());
+    const bgNovel = getBackgroundNovel();
+    if (bgNovel && bgNovel.id === novelId) {
+      setNovel(bgNovel);
+    }
+  }), [novelId]);
+
+  const isFetchingAll = fetchState.isFetching && fetchState.progress.novelId === novelId;
+  const fetchProgress = fetchState.progress;
 
   const handleNavSelectChapter = useCallback((chapter: Chapter) => {
     forceScrollTopRef.current = true;
