@@ -12,6 +12,7 @@ import {
   generateId,
 } from '@/lib/novel-store';
 import { syncLibraryFromBackend, syncNovel, syncDeleteNovel } from '@/lib/sync-service';
+import { orderChapters } from '@/lib/chapter-order';
 import { useAuth } from '@/hooks/useAuth';
 import { BookOpen, LogOut, LogIn, Loader2, WifiOff } from 'lucide-react';
 import { Button } from '@/components/ui/button';

@@ -4,7 +4,7 @@ import { getBookmarks, type Bookmark } from './bookmarks';
 import { getReadingProgress, saveReadingProgress, getLastReadChapter, saveLastReadChapter } from './storage-manager';
 import { setSyncStatus } from '@/hooks/useSyncStatus';
 import { enqueue, dequeue, getQueueLength, onConnectivityChange } from './offline-queue';
-
+import { compareChapterOrder, orderChapters } from './chapter-order';
 // ── Caches ──
 
 let cachedUserId: string | null = null;

@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect, useRef } from 'react';
+import { useState, useCallback, useEffect, useRef, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import ChapterList from '@/components/ChapterList';
@@ -15,6 +15,7 @@ import { useReadingProgress } from '@/hooks/useReadingProgress';
 import { useBookmarks } from '@/hooks/useBookmarks';
 import { validateUrl } from '@/lib/validation';
 import { scrapeChapterContent } from '@/lib/api/firecrawl';
+import { orderChapters } from '@/lib/chapter-order';
 
 const Reader = () => {
   const { novelId } = useParams<{ novelId: string }>();
