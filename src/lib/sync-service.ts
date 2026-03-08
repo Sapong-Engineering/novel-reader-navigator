@@ -307,8 +307,9 @@ async function upsertNovelToBackend(novel: Novel, userId: string): Promise<void>
     .eq('id', novelUuid);
 
   // Batch upsert ALL chapters (metadata for all, content for those that have it)
-  // sort_order = array index preserves original scrape order
-  const allChaptersData = novel.chapters.map((ch, index) => ({
+  // sort_order uses chapter order so it stays stable across sessions/devices.
+  const orderedChapters = orderChapters(novel.chapters);
+  const allChaptersData = orderedChapters.map((ch, index) => ({
     novel_id: novelUuid,
     user_id: userId,
     local_id: ch.id,

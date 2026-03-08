@@ -79,11 +79,11 @@ const Index = () => {
         url,
         coverUrl: info.coverUrl,
         description: info.description,
-        chapters: info.chapters.map(ch => ({
+        chapters: orderChapters(info.chapters.map(ch => ({
           id: ch.id,
           title: ch.title,
           url: ch.url,
-        })),
+        }))),
         savedAt: new Date().toISOString(),
       };
       saveNovel(newNovel);

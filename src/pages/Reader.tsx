@@ -226,7 +226,7 @@ const Reader = () => {
     <div className="h-screen flex flex-col bg-background">
       <NovelToolbar
         title={novel.title}
-        chapterCount={novel.chapters.length}
+        chapterCount={orderedChapters.length}
         savedCount={savedCount}
         onExportPdf={handleExportPdf}
         onExportDocx={handleExportDocx}
@@ -238,7 +238,7 @@ const Reader = () => {
         showReaderSettings
         mobileChapterDrawer={
           <MobileChapterDrawer
-            chapters={novel.chapters}
+            chapters={orderedChapters}
             activeChapterId={activeChapter?.id}
             onSelectChapter={handleSelectChapter}
             bookmarks={bookmarks}
@@ -252,7 +252,7 @@ const Reader = () => {
         <div className="w-72 border-r border-border bg-card flex-shrink-0 hidden md:flex flex-col">
           <ErrorBoundary>
             <ChapterList
-              chapters={novel.chapters}
+              chapters={orderedChapters}
               activeChapterId={activeChapter?.id}
               onSelectChapter={handleSelectChapter}
               bookmarks={bookmarks}
