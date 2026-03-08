@@ -406,6 +406,7 @@ export async function fetchChapterContentFromBackend(
 // ── Bookmarks ──
 
 export async function syncBookmarksToBackend(novelLocalId: string): Promise<void> {
+  if (!isSyncEnabled()) return;
   if (!navigator.onLine) {
     enqueue('syncBookmarks', { novelLocalId });
     setSyncStatus('idle');
