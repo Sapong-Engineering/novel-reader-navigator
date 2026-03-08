@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import NovelUrlInput from '@/components/NovelUrlInput';
@@ -23,15 +23,18 @@ const Index = () => {
   const [library, setLibrary] = useState<Novel[]>(() => getLibrary());
   const [isSyncing, setIsSyncing] = useState(false);
 
-  // Sync library from backend when authenticated
+  // Sync library from backend when authenticated (guarded against double-fire)
+  const syncedRef = useRef(false);
   useEffect(() => {
-    if (user && !authLoading) {
+    if (user && !authLoading && !syncedRef.current) {
+      syncedRef.current = true;
       setIsSyncing(true);
       syncLibraryFromBackend()
         .then(novels => setLibrary(novels))
         .catch(() => setLibrary(getLibrary()))
         .finally(() => setIsSyncing(false));
     }
+    if (!user) syncedRef.current = false;
   }, [user, authLoading]);
 
   const handleFetchNovel = useCallback(async (url: string) => {
