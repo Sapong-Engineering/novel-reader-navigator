@@ -1,19 +1,54 @@
+import { useState, useCallback } from 'react';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { Slider } from '@/components/ui/slider';
 import { Separator } from '@/components/ui/separator';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Settings, Sun, Moon, Monitor, Minus, Plus, RefreshCw, Wrench, RotateCcw } from 'lucide-react';
+import { Settings, Sun, Moon, Monitor, Minus, Plus, RefreshCw, Wrench, RotateCcw, Volume2, BellRing } from 'lucide-react';
 import { useThemeContext } from '@/contexts/ThemeContext';
 import { useReaderContext } from '@/contexts/ReaderContext';
 import { useAppSettings } from '@/contexts/AppSettingsContext';
+import { requestNotificationPermission, getNotificationPermission } from '@/lib/notify';
 import { type ReactNode } from 'react';
 
 interface SettingsPanelProps {
   onSync?: () => void;
   onRepairChapterOrder?: () => void;
   trigger?: ReactNode;
+}
+function BrowserNotificationToggle() {
+  const appSettings = useAppSettings();
+  const [permState, setPermState] = useState<NotificationPermission>(getNotificationPermission);
+
+  const handleToggle = useCallback(async (checked: boolean) => {
+    if (checked && permState !== 'granted') {
+      const result = await requestNotificationPermission();
+      setPermState(result);
+      if (result !== 'granted') return;
+    }
+    appSettings.setBrowserNotificationsEnabled(checked);
+  }, [permState, appSettings]);
+
+  const denied = permState === 'denied';
+
+  return (
+    <div className="flex items-center justify-between">
+      <div>
+        <p className="text-sm font-sans-ui text-foreground flex items-center gap-1.5">
+          <BellRing className="w-3.5 h-3.5" /> Browser Alerts
+        </p>
+        <p className="text-xs text-muted-foreground font-sans-ui">
+          {denied ? 'Blocked by browser — enable in site settings' : 'Show OS notifications when tab is in background'}
+        </p>
+      </div>
+      <Switch
+        checked={appSettings.browserNotificationsEnabled && !denied}
+        onCheckedChange={handleToggle}
+        disabled={!appSettings.notificationsEnabled || denied}
+      />
+    </div>
+  );
 }
 
 const SettingsPanel = ({ onSync, onRepairChapterOrder, trigger }: SettingsPanelProps) => {
@@ -202,6 +237,20 @@ const SettingsPanel = ({ onSync, onRepairChapterOrder, trigger }: SettingsPanelP
                   disabled={!appSettings.notificationsEnabled}
                 />
               </div>
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-sans-ui text-foreground flex items-center gap-1.5">
+                    <Volume2 className="w-3.5 h-3.5" /> Sound
+                  </p>
+                  <p className="text-xs text-muted-foreground font-sans-ui">Play a chime for notifications</p>
+                </div>
+                <Switch
+                  checked={appSettings.soundEnabled}
+                  onCheckedChange={appSettings.setSoundEnabled}
+                  disabled={!appSettings.notificationsEnabled}
+                />
+              </div>
+              <BrowserNotificationToggle />
             </div>
           </section>
 
