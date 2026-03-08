@@ -1,5 +1,6 @@
 import { AdapterRegistry } from './adapters/types.ts';
 import { DefaultAdapter } from './adapters/default-adapter.ts';
+import { WuxiaClickAdapter } from './adapters/wuxiaclick-adapter.ts';
 import { novelInfoCache, Cache } from '../shared/cache.ts';
 
 const corsHeaders = {
@@ -8,6 +9,7 @@ const corsHeaders = {
 };
 
 const registry = new AdapterRegistry(new DefaultAdapter());
+registry.register(new WuxiaClickAdapter());
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
