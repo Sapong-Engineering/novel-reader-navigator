@@ -7,7 +7,7 @@ import NovelToolbar from '@/components/NovelToolbar';
 import MobileChapterDrawer from '@/components/MobileChapterDrawer';
 import ErrorBoundary from '@/components/ErrorBoundary';
 import { type Novel, type Chapter, saveNovel, getNovel } from '@/lib/novel-store';
-import { syncNovel, syncBookmarksToBackend, syncProgressToBackend, fetchChapterContentFromBackend, syncChapterToBackend } from '@/lib/sync-service';
+import { syncNovel, syncBookmarksToBackend, syncProgressToBackend, fetchChapterContentFromBackend, syncChapterToBackend, syncFullNovelFromBackend } from '@/lib/sync-service';
 import { exportToPdfWithProgress, exportToDocxWithProgress } from '@/lib/export-service';
 import { useChapterNavigation } from '@/hooks/useChapterNavigation';
 import { useChapterFetcher } from '@/hooks/useChapterFetcher';
