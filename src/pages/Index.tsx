@@ -54,7 +54,7 @@ const Index = () => {
         .finally(() => setIsSyncing(false));
     }
     if (!user) syncedRef.current = false;
-  }, [user, authLoading]);
+  }, [user, authLoading, appSettings.syncEnabled]);
 
   const handleFetchNovel = useCallback(async (url: string) => {
     // Check if novel with same URL already exists
