@@ -204,6 +204,20 @@ const SettingsPanel = ({ onSync, onRepairChapterOrder, trigger }: SettingsPanelP
                   disabled={!appSettings.notificationsEnabled}
                 />
               </div>
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-sans-ui text-foreground flex items-center gap-1.5">
+                    <Volume2 className="w-3.5 h-3.5" /> Sound
+                  </p>
+                  <p className="text-xs text-muted-foreground font-sans-ui">Play a chime for notifications</p>
+                </div>
+                <Switch
+                  checked={appSettings.soundEnabled}
+                  onCheckedChange={appSettings.setSoundEnabled}
+                  disabled={!appSettings.notificationsEnabled}
+                />
+              </div>
+              <BrowserNotificationToggle />
             </div>
           </section>
 
