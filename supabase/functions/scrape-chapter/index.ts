@@ -1,4 +1,5 @@
 import { chapterContentCache, Cache } from '../shared/cache.ts';
+import { cleanChapterContent } from '../shared/chapter-cleaner.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -71,15 +72,8 @@ Deno.serve(async (req) => {
 
     const markdown = data.data?.markdown || data.markdown || '';
 
-    // Clean up the markdown - remove navigation elements and ads
-    const content = markdown
-      // Remove cookie/ad banners
-      .replace(/Your experience on this site.*$/s, '')
-      // Remove navigation links like "Previous Chapter" / "Next Chapter"
-      .replace(/\[.*?(?:Previous|Next)\s*(?:Chapter)?\s*\]\(.*?\)/gi, '')
-      // Clean up excessive newlines
-      .replace(/\n{4,}/g, '\n\n\n')
-      .trim();
+    // Clean up the markdown - remove navigation, branding, breadcrumbs
+    const content = cleanChapterContent(markdown, formattedUrl);
 
     // Store in cache
     chapterContentCache.set(cacheKey, content);
