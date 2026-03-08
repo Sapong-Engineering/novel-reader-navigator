@@ -7,16 +7,16 @@ import NovelToolbar from '@/components/NovelToolbar';
 import MobileChapterDrawer from '@/components/MobileChapterDrawer';
 import ErrorBoundary from '@/components/ErrorBoundary';
 import { type Novel, type Chapter, saveNovel, getNovel } from '@/lib/novel-store';
-import { syncNovel, syncBookmarksToBackend, syncProgressToBackend, fetchChapterContentFromBackend, syncChapterToBackend, syncFullNovelFromBackend } from '@/lib/sync-service';
+import { syncNovel, syncBookmarksToBackend, syncProgressToBackend, fetchChapterContentFromBackend, syncFullNovelFromBackend } from '@/lib/sync-service';
 import { exportToPdfWithProgress, exportToDocxWithProgress } from '@/lib/export-service';
 import { useChapterNavigation } from '@/hooks/useChapterNavigation';
-import { useChapterFetcher } from '@/hooks/useChapterFetcher';
 import { useReadingProgress } from '@/hooks/useReadingProgress';
 import { useBookmarks } from '@/hooks/useBookmarks';
 import { validateUrl } from '@/lib/validation';
 import { scrapeChapterContent } from '@/lib/api/firecrawl';
 import { orderChapters } from '@/lib/chapter-order';
 import { useAppSettings } from '@/contexts/AppSettingsContext';
+import { startFetchAll, cancelFetchAll, getFetchAllState, subscribeFetchAll, getBackgroundNovel } from '@/lib/background-fetch';
 
 const Reader = () => {
   const { novelId } = useParams<{ novelId: string }>();
@@ -27,8 +27,20 @@ const Reader = () => {
   const pendingScrollRef = useRef<number | null>(null);
   const forceScrollTopRef = useRef(false);
 
-  const { isFetching: isFetchingAll, progress: fetchProgress, fetchAll } = useChapterFetcher();
   const appSettings = useAppSettings();
+
+  // Background fetch state — subscribe to global singleton
+  const [fetchState, setFetchState] = useState(getFetchAllState);
+  useEffect(() => subscribeFetchAll(() => {
+    setFetchState(getFetchAllState());
+    const bgNovel = getBackgroundNovel();
+    if (bgNovel && bgNovel.id === novelId) {
+      setNovel(bgNovel);
+    }
+  }), [novelId]);
+
+  const isFetchingAll = fetchState.isFetching && fetchState.progress.novelId === novelId;
+  const fetchProgress = fetchState.progress;
 
   const handleNavSelectChapter = useCallback((chapter: Chapter) => {
     forceScrollTopRef.current = true;
@@ -202,15 +214,10 @@ const Reader = () => {
 
   const handleFetchAll = useCallback(async () => {
     if (!novel || isFetchingAll) return;
-    await fetchAll(novel, (updatedNovel) => {
+    await startFetchAll(novel, (updatedNovel) => {
       setNovel(updatedNovel);
-    }, (novelId, chapter) => {
-      syncChapterToBackend(novelId, chapter);
     });
-    // Final full sync after batch completes
-    const latest = getNovel(novelIdStr);
-    if (latest) syncNovel(latest);
-  }, [novel, isFetchingAll, fetchAll, novelIdStr]);
+  }, [novel, isFetchingAll]);
 
   const handleSave = useCallback(() => {
     if (novel) {
