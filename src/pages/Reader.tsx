@@ -75,6 +75,7 @@ const Reader = () => {
     }
 
     // Sync from backend to pick up new chapters (cron-discovered or from other devices)
+    if (!appSettings.syncEnabled) return;
     syncFullNovelFromBackend(novelId).then(synced => {
       if (synced) {
         setNovel(prev => {
