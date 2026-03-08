@@ -75,13 +75,23 @@ Deno.serve(async (req) => {
 
         const remoteChapters: { id: string; title: string; url: string }[] = scrapeData.data.chapters;
 
-        // Get existing chapter local_ids for this novel
-        const { data: existingChapters } = await supabase
-          .from('chapters')
-          .select('local_id')
-          .eq('novel_id', novel.id);
+        // Get ALL existing chapter local_ids for this novel (paginated to avoid 1000-row limit)
+        const allExisting: { local_id: string }[] = [];
+        let from = 0;
+        const PAGE = 1000;
+        while (true) {
+          const { data: page } = await supabase
+            .from('chapters')
+            .select('local_id')
+            .eq('novel_id', novel.id)
+            .range(from, from + PAGE - 1);
+          if (!page || page.length === 0) break;
+          allExisting.push(...page);
+          if (page.length < PAGE) break;
+          from += PAGE;
+        }
 
-        const existingIds = new Set((existingChapters ?? []).map(c => c.local_id));
+        const existingIds = new Set(allExisting.map(c => c.local_id));
 
         // Find new chapters
         const newChapters = remoteChapters.filter(ch => !existingIds.has(ch.id));
