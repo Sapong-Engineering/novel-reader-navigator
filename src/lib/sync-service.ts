@@ -154,6 +154,7 @@ async function getOrCreateNovelId(localId: string, userId: string, novel: Novel)
 // ── Novels ──
 
 export async function syncLibraryFromBackend(): Promise<Novel[]> {
+  if (!isSyncEnabled()) return getLibrary();
   const userId = await getUserId();
   if (!userId) return getLibrary();
   setSyncStatus('syncing');
