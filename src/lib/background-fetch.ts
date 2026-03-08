@@ -60,7 +60,8 @@ export async function startFetchAll(
   }
 
   _isFetching = true;
-  _progress = { current: 0, total: unfetched.length, novelId: novel.id, novelTitle: novel.title };
+  const alreadyFetched = novel.chapters.filter(c => !!c.content).length;
+  _progress = { current: 0, total: unfetched.length, totalChapters: novel.chapters.length, fetchedChapters: alreadyFetched, novelId: novel.id, novelTitle: novel.title };
   _currentNovel = novel;
   batchFetcher.reset();
   emit();
