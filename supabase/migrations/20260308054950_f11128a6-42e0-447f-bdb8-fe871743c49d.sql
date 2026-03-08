@@ -1,0 +1,1 @@
+TRUNCATE public.reading_progress, public.bookmarks, public.chapters, public.novels CASCADE;

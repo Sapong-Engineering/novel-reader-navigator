@@ -161,7 +161,7 @@ export async function syncLibraryFromBackend(): Promise<Novel[]> {
     // Fetch novels and chapter METADATA only (skip content for speed)
     const [novelsRes, chaptersRes] = await Promise.all([
       supabase.from('novels').select('*'),
-      supabase.from('chapters').select('id,novel_id,local_id,title,url,saved_at'),
+      supabase.from('chapters').select('id,novel_id,local_id,title,url,saved_at,sort_order'),
     ]);
 
     if (novelsRes.error) throw novelsRes.error;
@@ -197,11 +197,13 @@ export async function syncLibraryFromBackend(): Promise<Novel[]> {
 
     for (const rn of remoteNovels) {
       seenLocalIds.add(rn.local_id);
-      const chapters = (chaptersByNovelId.get(rn.id) ?? []).map(c => ({
+      const rawChapters = chaptersByNovelId.get(rn.id) ?? [];
+      // Sort by sort_order from backend to restore original scrape order
+      rawChapters.sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0));
+      const chapters = rawChapters.map(c => ({
         id: c.local_id,
         title: c.title,
         url: c.url,
-        // No content from backend during initial sync — use local content if available
         savedAt: c.saved_at ?? undefined,
       }));
 
@@ -296,7 +298,8 @@ async function upsertNovelToBackend(novel: Novel, userId: string): Promise<void>
     .eq('id', novelUuid);
 
   // Batch upsert ALL chapters (metadata for all, content for those that have it)
-  const allChaptersData = novel.chapters.map(ch => ({
+  // sort_order = array index preserves original scrape order
+  const allChaptersData = novel.chapters.map((ch, index) => ({
     novel_id: novelUuid,
     user_id: userId,
     local_id: ch.id,
@@ -304,6 +307,7 @@ async function upsertNovelToBackend(novel: Novel, userId: string): Promise<void>
     url: ch.url,
     content: ch.content ?? null,
     saved_at: ch.savedAt ?? null,
+    sort_order: index,
   }));
 
   const chaptersPromise = allChaptersData.length > 0
