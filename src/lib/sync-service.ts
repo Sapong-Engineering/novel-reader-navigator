@@ -241,8 +241,10 @@ export async function syncLibraryFromBackend(): Promise<Novel[]> {
       }
     }
 
+    setSyncStatus('done');
     return Array.from(urlMap.values());
   } catch (err) {
+    setSyncStatus('error');
     console.error('Sync failed, using local data:', err);
     return getLibrary();
   }
