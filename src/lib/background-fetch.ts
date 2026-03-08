@@ -22,7 +22,7 @@ const rateLimiter = new RateLimiter({ requestsPerSecond: 2, maxConcurrent: 3 });
 const batchFetcher = new BatchFetcher<Chapter>({ batchSize: 3 });
 
 let _isFetching = false;
-let _progress: FetchProgress = { current: 0, total: 0, novelId: '', novelTitle: '' };
+let _progress: FetchProgress = { current: 0, total: 0, totalChapters: 0, fetchedChapters: 0, novelId: '', novelTitle: '' };
 let _currentNovel: Novel | null = null;
 const listeners = new Set<Listener>();
 
