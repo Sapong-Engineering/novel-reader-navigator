@@ -17,6 +17,7 @@ import { validateUrl } from '@/lib/validation';
 import { scrapeChapterContent } from '@/lib/api/firecrawl';
 import { orderChapters } from '@/lib/chapter-order';
 import { useAppSettings } from '@/contexts/AppSettingsContext';
+import { startFetchAll, cancelFetchAll, getFetchAllState, subscribeFetchAll, getBackgroundNovel } from '@/lib/background-fetch';
 
 const Reader = () => {
   const { novelId } = useParams<{ novelId: string }>();
