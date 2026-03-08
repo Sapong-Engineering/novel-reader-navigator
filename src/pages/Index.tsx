@@ -28,6 +28,7 @@ const Index = () => {
   const [library, setLibrary] = useState<Novel[]>(() => getLibrary());
   const [isSyncing, setIsSyncing] = useState(false);
   const [isOnline, setIsOnline] = useState(navigator.onLine);
+  const appSettings = useAppSettings();
 
   // Track online/offline status
   useEffect(() => {
