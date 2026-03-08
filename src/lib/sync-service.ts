@@ -498,15 +498,14 @@ export async function syncFullNovelFromBackend(novelLocalId: string): Promise<No
     const novelUuid = await resolveNovelUuid(novelLocalId, userId);
     if (!novelUuid) return null;
 
-    const [novelRes, chaptersRes] = await Promise.all([
+    const [novelRes, remoteChapters] = await Promise.all([
       supabase.from('novels').select('*').eq('id', novelUuid).single(),
-      supabase.from('chapters').select('*').eq('novel_id', novelUuid).order('sort_order'),
+      fetchAllRows<any>(() => supabase.from('chapters').select('*').eq('novel_id', novelUuid).order('sort_order')),
     ]);
 
     if (novelRes.error || !novelRes.data) return null;
 
     const rn = novelRes.data;
-    const remoteChapters = chaptersRes.data ?? [];
 
     const localNovel = getNovel(novelLocalId);
 
