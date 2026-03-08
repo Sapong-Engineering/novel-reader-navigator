@@ -299,9 +299,12 @@ async function upsertNovelToBackend(novel: Novel, userId: string): Promise<void>
 export async function syncNovel(novel: Novel): Promise<void> {
   const userId = await getUserId();
   if (!userId) return;
+  setSyncStatus('syncing');
   try {
     await upsertNovelToBackend(novel, userId);
+    setSyncStatus('done');
   } catch (err) {
+    setSyncStatus('error');
     console.error('Failed to sync novel to backend:', err);
   }
 }
