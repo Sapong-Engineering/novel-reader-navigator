@@ -10,6 +10,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Progress } from '@/components/ui/progress';
 import { ReaderSettingsPopover } from '@/components/reader/ReaderSettingsPopover';
+import SettingsPanel from '@/components/SettingsPanel';
 
 interface NovelToolbarProps {
   title: string;
