@@ -3,6 +3,7 @@ import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { Slider } from '@/components/ui/slider';
 import { Separator } from '@/components/ui/separator';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Settings, Sun, Moon, Monitor, Minus, Plus, RefreshCw, Wrench, RotateCcw } from 'lucide-react';
 import { useThemeContext } from '@/contexts/ThemeContext';
 import { useReaderContext } from '@/contexts/ReaderContext';
