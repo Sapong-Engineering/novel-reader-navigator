@@ -18,9 +18,14 @@ export class NovelBinAdapter implements SiteAdapter {
     const slugMatch = baseUrl.match(/\/b\/([^/?#]+)/);
     const slug = slugMatch ? slugMatch[1].replace(/\/$/, '') : '';
 
-    // Extract title from ### heading or metadata
-    const titleMatch = markdown.match(/^###?\s+(.+)$/m);
-    const title = titleMatch ? titleMatch[1].replace(/\[.*?\]\(.*?\)/g, '').trim() : metadata.title || 'Unknown Novel';
+    // Extract title: look for "# [Title](url)" pattern first, then ### heading
+    const linkedTitleMatch = markdown.match(/^#\s+\[([^\]]+)\]/m);
+    const headingMatch = markdown.match(/^###\s+([^\[#\n]+)/m);
+    const title = linkedTitleMatch
+      ? linkedTitleMatch[1].trim()
+      : headingMatch
+        ? headingMatch[1].trim()
+        : metadata.title?.replace(/\s*[-|].*$/, '') || 'Unknown Novel';
 
     // Extract description — text block after tabs section, before chapter list
     const descMatch = markdown.match(/(?:Comments\))\s*\n\n([\s\S]*?)(?=\n-\s*\[Chapter\s+\d)/i);
