@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect, useRef } from 'react';
+import { useState, useCallback, useEffect, useRef, lazy, Suspense } from 'react';
 import { hideSplash } from '@/lib/splash';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
@@ -16,19 +16,21 @@ import { syncLibraryFromBackend, syncNovel, syncDeleteNovel } from '@/lib/sync-s
 import { orderChapters } from '@/lib/chapter-order';
 import { useAuth } from '@/hooks/useAuth';
 import { BookOpen, LogOut, LogIn, Loader2, WifiOff, RefreshCw, Shield, Search as SearchIcon, Link as LinkIcon } from 'lucide-react';
-import NovelSearch from '@/components/NovelSearch';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
 import SyncIndicator from '@/components/SyncIndicator';
-import SettingsPanel from '@/components/SettingsPanel';
-import NotificationCenter from '@/components/NotificationCenter';
 import BackgroundFetchBanner from '@/components/BackgroundFetchBanner';
-import ReadingStats from '@/components/ReadingStats';
-import ReadingListManager from '@/components/ReadingListManager';
 import AddToListMenu from '@/components/AddToListMenu';
 import { useAppSettings } from '@/contexts/AppSettingsContext';
 import { useReadingLists } from '@/hooks/useReadingLists';
 import { isSyncEnabled } from '@/lib/notify';
+
+// Lazy-load non-critical toolbar & tab components to reduce initial bundle
+const NovelSearch = lazy(() => import('@/components/NovelSearch'));
+const SettingsPanel = lazy(() => import('@/components/SettingsPanel'));
+const NotificationCenter = lazy(() => import('@/components/NotificationCenter'));
+const ReadingStats = lazy(() => import('@/components/ReadingStats'));
+const ReadingListManager = lazy(() => import('@/components/ReadingListManager'));
 
 const Index = () => {
   const navigate = useNavigate();
@@ -180,17 +182,19 @@ const Index = () => {
           </Button>
         )}
         <SyncIndicator />
-        <NotificationCenter />
-        <ReadingStats />
+        <Suspense fallback={null}><NotificationCenter /></Suspense>
+        <Suspense fallback={null}><ReadingStats /></Suspense>
         {user && (
-          <ReadingListManager
-            lists={readingLists.lists}
-            onCreate={readingLists.createList}
-            onRename={readingLists.renameList}
-            onDelete={readingLists.deleteList}
-          />
+          <Suspense fallback={null}>
+            <ReadingListManager
+              lists={readingLists.lists}
+              onCreate={readingLists.createList}
+              onRename={readingLists.renameList}
+              onDelete={readingLists.deleteList}
+            />
+          </Suspense>
         )}
-        <SettingsPanel onSync={user ? handleManualSync : undefined} />
+        <Suspense fallback={null}><SettingsPanel onSync={user ? handleManualSync : undefined} /></Suspense>
         {authLoading ? null : user ? (
           <>
             {isAdmin && (
@@ -239,7 +243,9 @@ const Index = () => {
               <NovelUrlInput onSubmit={handleFetchNovel} isLoading={isLoadingNovel} />
             </TabsContent>
             <TabsContent value="search">
-              <NovelSearch onAddNovel={handleFetchNovel} isAddingNovel={isLoadingNovel} />
+              <Suspense fallback={<div className="flex justify-center py-8"><Loader2 className="w-5 h-5 animate-spin text-muted-foreground" /></div>}>
+                <NovelSearch onAddNovel={handleFetchNovel} isAddingNovel={isLoadingNovel} />
+              </Suspense>
             </TabsContent>
           </Tabs>
         </div>
