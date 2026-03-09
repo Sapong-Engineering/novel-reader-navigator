@@ -17,6 +17,30 @@ Deno.serve(async (req) => {
   }
 
   try {
+    // Authenticate the caller
+    const authHeader = req.headers.get('Authorization');
+    if (!authHeader?.startsWith('Bearer ')) {
+      return new Response(
+        JSON.stringify({ success: false, error: 'Unauthorized' }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    const userClient = createClient(
+      Deno.env.get('SUPABASE_URL')!,
+      Deno.env.get('SUPABASE_ANON_KEY')!,
+      { global: { headers: { Authorization: authHeader } } }
+    );
+
+    const token = authHeader.replace('Bearer ', '');
+    const { data: claimsData, error: claimsError } = await userClient.auth.getClaims(token);
+    if (claimsError || !claimsData?.claims) {
+      return new Response(
+        JSON.stringify({ success: false, error: 'Unauthorized' }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
     const { query } = await req.json();
 
     if (!query || typeof query !== 'string' || query.trim().length < 2) {
@@ -34,14 +58,14 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Read enabled adapters from admin_settings
-    const supabase = createClient(
+    // Read enabled adapters from admin_settings using service role (adapter settings are not user-scoped)
+    const serviceClient = createClient(
       Deno.env.get('SUPABASE_URL')!,
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
     );
 
     const adapterKeys = Object.keys(ADAPTER_SITE_MAP);
-    const { data: settings } = await supabase
+    const { data: settings } = await serviceClient
       .from('admin_settings')
       .select('key, value')
       .in('key', adapterKeys);
@@ -96,7 +120,6 @@ Deno.serve(async (req) => {
 
         if (source === 'unknown') return null;
 
-        // Double-check the source site is enabled
         const domain = source === 'NovelBin' ? 'novelbin.com' : source === 'WuxiaClick' ? 'wuxia.click' : 'empirenovel.com';
         if (!enabledSitesSet.has(domain)) return null;
 
