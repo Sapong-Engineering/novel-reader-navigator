@@ -49,7 +49,15 @@ Deno.serve(async (req) => {
       });
     }
 
-    const { action, ...params } = await req.json();
+    const body = await req.json().catch(() => ({}));
+    const { action, ...params } = body;
+
+    // Lightweight admin check endpoint — no body needed
+    if (action === 'check-admin') {
+      return new Response(JSON.stringify({ success: true, data: { isAdmin: true } }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
 
     let result: any;
 
