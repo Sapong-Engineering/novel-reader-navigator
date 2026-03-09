@@ -72,9 +72,9 @@ const Index = () => {
       syncLibraryFromBackend()
         .then(novels => setLibrary(novels))
         .catch(() => setLibrary(getLibrary()))
-        .finally(() => setIsSyncing(false));
-    }
-    if (!user) syncedRef.current = false;
+        .finally(() => { setIsSyncing(false); hideSplash(); });
+    } else {
+      hideSplash();
   }, [user, authLoading, appSettings.syncEnabled]);
 
   const handleFetchNovel = useCallback(async (url: string) => {
