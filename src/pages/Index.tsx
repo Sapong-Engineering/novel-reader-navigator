@@ -182,17 +182,19 @@ const Index = () => {
           </Button>
         )}
         <SyncIndicator />
-        <NotificationCenter />
-        <ReadingStats />
+        <Suspense fallback={null}><NotificationCenter /></Suspense>
+        <Suspense fallback={null}><ReadingStats /></Suspense>
         {user && (
-          <ReadingListManager
-            lists={readingLists.lists}
-            onCreate={readingLists.createList}
-            onRename={readingLists.renameList}
-            onDelete={readingLists.deleteList}
-          />
+          <Suspense fallback={null}>
+            <ReadingListManager
+              lists={readingLists.lists}
+              onCreate={readingLists.createList}
+              onRename={readingLists.renameList}
+              onDelete={readingLists.deleteList}
+            />
+          </Suspense>
         )}
-        <SettingsPanel onSync={user ? handleManualSync : undefined} />
+        <Suspense fallback={null}><SettingsPanel onSync={user ? handleManualSync : undefined} /></Suspense>
         {authLoading ? null : user ? (
           <>
             {isAdmin && (
