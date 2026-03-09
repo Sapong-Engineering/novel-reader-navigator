@@ -36,6 +36,23 @@ Deno.serve(async (req) => {
     );
   }
 
+  // Verify caller is an admin
+  const userId = claimsData.claims.sub as string;
+  const serviceClient = createClient(supabaseUrl, serviceRoleKey);
+  const { data: roleData } = await serviceClient
+    .from('user_roles')
+    .select('role')
+    .eq('user_id', userId)
+    .eq('role', 'admin')
+    .maybeSingle();
+
+  if (!roleData) {
+    return new Response(
+      JSON.stringify({ error: 'Forbidden: admin access required' }),
+      { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    );
+  }
+
   if (!firecrawlKey) {
     return new Response(JSON.stringify({ error: 'FIRECRAWL_API_KEY not set' }), {
       status: 500,
@@ -44,7 +61,7 @@ Deno.serve(async (req) => {
   }
 
   // Use service role for DB operations (cross-user novel refresh)
-  const supabase = createClient(supabaseUrl, serviceRoleKey);
+  const supabase = serviceClient;
 
   try {
     let intervalHours = 24;
