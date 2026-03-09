@@ -75,6 +75,8 @@ const Index = () => {
         .finally(() => { setIsSyncing(false); hideSplash(); });
     } else {
       hideSplash();
+    }
+    if (!user) syncedRef.current = false;
   }, [user, authLoading, appSettings.syncEnabled]);
 
   const handleFetchNovel = useCallback(async (url: string) => {
