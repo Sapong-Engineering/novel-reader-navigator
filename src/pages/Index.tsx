@@ -1,4 +1,5 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
+import { hideSplash } from '@/lib/splash';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import NovelUrlInput from '@/components/NovelUrlInput';
