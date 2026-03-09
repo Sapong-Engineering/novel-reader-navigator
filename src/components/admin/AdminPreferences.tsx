@@ -9,6 +9,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Slider } from '@/components/ui/slider';
 import { Loader2, Palette, Bot, Wrench } from 'lucide-react';
+import AmbientSoundManager from './AmbientSoundManager';
 
 type Settings = Record<string, any>;
 
@@ -223,6 +224,9 @@ const AdminPreferences = () => {
           </div>
         </CardContent>
       </Card>
+
+      {/* Ambient Sounds */}
+      <AmbientSoundManager />
 
       {saving && (
         <div className="fixed bottom-4 right-4 bg-card border border-border rounded-lg px-3 py-2 shadow-lg flex items-center gap-2 text-sm text-muted-foreground">
