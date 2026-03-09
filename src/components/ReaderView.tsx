@@ -307,7 +307,7 @@ const ReaderView = ({
       )}
 
       {/* Bottom navigation */}
-      <div className={`reader-nav-bar px-3 sm:px-6 py-3.5 flex items-center justify-between ${isImmersive ? 'opacity-0 pointer-events-none' : ''}`}>
+      <div className={`reader-nav-bar px-3 sm:px-6 py-3.5 flex items-center justify-between transition-opacity duration-300 ${isImmersive ? 'opacity-0 hover:opacity-100 focus-within:opacity-100' : ''}`}>
         <Button
           variant="outline"
           size="sm"
