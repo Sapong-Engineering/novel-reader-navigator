@@ -1,4 +1,5 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
+import { hideSplash } from '@/lib/splash';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import NovelUrlInput from '@/components/NovelUrlInput';
@@ -71,7 +72,9 @@ const Index = () => {
       syncLibraryFromBackend()
         .then(novels => setLibrary(novels))
         .catch(() => setLibrary(getLibrary()))
-        .finally(() => setIsSyncing(false));
+        .finally(() => { setIsSyncing(false); hideSplash(); });
+    } else {
+      hideSplash();
     }
     if (!user) syncedRef.current = false;
   }, [user, authLoading, appSettings.syncEnabled]);
