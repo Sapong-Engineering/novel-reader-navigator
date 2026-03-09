@@ -1,13 +1,15 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
 import { toast } from 'sonner';
+import { supabase } from '@/integrations/supabase/client';
 
 export type AmbientSound = 'off' | 'rain' | 'fireplace' | 'cafe';
 
-const SOUND_URLS: Record<Exclude<AmbientSound, 'off'>, string> = {
-  rain: 'https://cdn.pixabay.com/audio/2022/10/11/audio_3cb43a9a10.mp3',
-  fireplace: 'https://cdn.pixabay.com/audio/2024/11/04/audio_38b1299e0c.mp3',
-  cafe: 'https://cdn.pixabay.com/audio/2022/04/27/audio_67bcce583c.mp3',
-};
+const BUCKET = 'ambient-sounds';
+
+function getPublicUrl(soundKey: string): string {
+  const { data } = supabase.storage.from(BUCKET).getPublicUrl(`${soundKey}.mp3`);
+  return data.publicUrl;
+}
 
 export function useImmersiveMode() {
   const [isImmersive, setIsImmersive] = useState(false);
