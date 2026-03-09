@@ -24,7 +24,7 @@ export function ReaderSettingsPopover({ onRepairChapterOrder }: ReaderSettingsPo
         <Button
           variant="outline"
           size="sm"
-          className="font-sans-ui hidden sm:inline-flex px-2.5"
+          className="font-sans-ui inline-flex px-2.5"
           aria-label="Reader settings"
         >
           <span className="text-sm font-semibold tracking-tight leading-none">Aa</span>
