@@ -31,10 +31,10 @@ const App = () => (
               <BrowserRouter>
                 <Routes>
                 <Route path="/" element={<Index />} />
-                  <Route path="/auth" element={<Auth />} />
-                  <Route path="/admin" element={<Admin />} />
-                  <Route path="/reader/:novelId" element={<Reader />} />
-                  <Route path="*" element={<NotFound />} />
+                  <Route path="/auth" element={<Suspense fallback={null}><Auth /></Suspense>} />
+                  <Route path="/admin" element={<Suspense fallback={null}><Admin /></Suspense>} />
+                  <Route path="/reader/:novelId" element={<Suspense fallback={null}><Reader /></Suspense>} />
+                  <Route path="*" element={<Suspense fallback={null}><NotFound /></Suspense>} />
                 </Routes>
               </BrowserRouter>
             </TooltipProvider>
