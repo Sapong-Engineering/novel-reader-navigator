@@ -50,21 +50,41 @@ export function useImmersiveMode() {
   }, [isImmersive, enter, exit]);
 
   // Called directly from click handler (user gesture context)
-  const setAmbientSound = useCallback((sound: AmbientSound) => {
+  const setAmbientSound = useCallback(async (sound: AmbientSound) => {
     setAmbientSoundState(sound);
     stopAudio();
 
     if (sound === 'off' || !isImmersive) return;
 
+    // Create audio element synchronously in user gesture context to unlock playback
     const audio = new Audio();
     audio.loop = true;
     audio.volume = volume;
-    audio.src = getPublicUrl(sound);
-    audio.play().catch((err) => {
+    audio.crossOrigin = 'anonymous';
+    audioRef.current = audio;
+
+    try {
+      // Use signed URL for reliable access
+      const { data, error } = await supabase.storage
+        .from(BUCKET)
+        .createSignedUrl(`${sound}.mp3`, 3600);
+
+      if (error || !data?.signedUrl) {
+        console.error('Failed to get sound URL:', error);
+        toast.error('Sound file not found. Upload it in Admin → Preferences.');
+        stopAudio();
+        setAmbientSoundState('off');
+        return;
+      }
+
+      audio.src = data.signedUrl;
+      await audio.play();
+    } catch (err) {
       console.warn('Ambient sound playback failed:', err);
       toast.error('Could not play ambient sound');
-    });
-    audioRef.current = audio;
+      stopAudio();
+      setAmbientSoundState('off');
+    }
   }, [isImmersive, volume]);
 
   const showControls = useCallback(() => {
