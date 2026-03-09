@@ -9,6 +9,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Slider } from '@/components/ui/slider';
 import { Loader2, Palette, Bot, Wrench } from 'lucide-react';
+import AmbientSoundManager from './AmbientSoundManager';
 
 type Settings = Record<string, any>;
 
