@@ -24,14 +24,10 @@ const Admin = () => {
       return;
     }
 
-    supabase
-      .from('user_roles')
-      .select('role')
-      .eq('user_id', user.id)
-      .eq('role', 'admin')
-      .maybeSingle()
-      .then(({ data }) => {
-        if (!data) {
+    supabase.functions
+      .invoke('admin-api', { body: { action: 'check-admin' } })
+      .then(({ data, error }) => {
+        if (error || !data?.data?.isAdmin) {
           toast.error('Access denied: admin role required');
           navigate('/');
         } else {
