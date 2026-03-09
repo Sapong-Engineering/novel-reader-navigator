@@ -66,6 +66,23 @@ Deno.serve(async (req) => {
       formattedUrl = `https://${formattedUrl}`;
     }
 
+    // Validate URL is from an allowed source
+    const ALLOWED_HOSTS = new Set(['wuxia.click', 'www.wuxia.click', 'novelbin.com', 'www.novelbin.com', 'empirenovel.com', 'www.empirenovel.com']);
+    try {
+      const parsed = new URL(formattedUrl);
+      if (!ALLOWED_HOSTS.has(parsed.hostname)) {
+        return new Response(
+          JSON.stringify({ success: false, error: 'URL not from a supported source' }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+    } catch {
+      return new Response(
+        JSON.stringify({ success: false, error: 'Invalid URL' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
     // Check cache first
     const cacheKey = Cache.keyFromUrl(formattedUrl);
     const cached = novelInfoCache.get(cacheKey);
