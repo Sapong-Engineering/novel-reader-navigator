@@ -6,7 +6,7 @@ Additionally, the audio is created inside a `useEffect` (not directly in a click
 
 ## Fix
 
-1. **Replace unreliable external URLs with locally hosted audio files** generated as short looping ambient tracks, and use reliable public-domain sources (e.g., from `pixabay.com/sound-effects` which provides direct hotlinkable MP3s with no CORS issues).
+1. **Replace unreliable external URLs with locally hosted audio files** generated as short looping ambient tracks, AND use reliable public-domain sources (e.g., from `pixabay.com/sound-effects` which provides direct hotlinkable MP3s with no CORS issues).
 2. **Create the Audio element synchronously in the click handler** (user gesture context) to satisfy browser autoplay policies, then set the source afterward.
 3. **Add error feedback** so users know if a sound fails to load instead of silent failure.
 
