@@ -50,41 +50,42 @@ export function useImmersiveMode() {
   }, [isImmersive, enter, exit]);
 
   // Called directly from click handler (user gesture context)
-  const setAmbientSound = useCallback(async (sound: AmbientSound) => {
+  const setAmbientSound = useCallback((sound: AmbientSound) => {
     setAmbientSoundState(sound);
     stopAudio();
 
     if (sound === 'off' || !isImmersive) return;
 
-    // Create audio element synchronously in user gesture context to unlock playback
+    // Create and start audio synchronously in user gesture to satisfy autoplay policy
     const audio = new Audio();
     audio.loop = true;
     audio.volume = volume;
-    audio.crossOrigin = 'anonymous';
     audioRef.current = audio;
 
-    try {
-      // Use signed URL for reliable access
-      const { data, error } = await supabase.storage
-        .from(BUCKET)
-        .createSignedUrl(`${sound}.mp3`, 3600);
+    // Start with a silent play to unlock audio context in user gesture
+    audio.play().catch(() => {});
 
-      if (error || !data?.signedUrl) {
-        console.error('Failed to get sound URL:', error);
-        toast.error('Sound file not found. Upload it in Admin → Preferences.');
-        stopAudio();
-        setAmbientSoundState('off');
-        return;
-      }
-
-      audio.src = data.signedUrl;
-      await audio.play();
-    } catch (err) {
-      console.warn('Ambient sound playback failed:', err);
-      toast.error('Could not play ambient sound');
-      stopAudio();
-      setAmbientSoundState('off');
-    }
+    // Fetch signed URL then set source
+    supabase.storage
+      .from(BUCKET)
+      .createSignedUrl(`${sound}.mp3`, 3600)
+      .then(({ data, error }) => {
+        if (error || !data?.signedUrl) {
+          console.error('Failed to get sound URL:', error);
+          toast.error('Sound file not found. Upload it in Admin → Preferences.');
+          stopAudio();
+          setAmbientSoundState('off');
+          return;
+        }
+        // Set source and play — audio context already unlocked
+        audio.src = data.signedUrl;
+        audio.play().catch((err) => {
+          console.warn('Ambient sound playback failed:', err);
+          toast.error('Could not play ambient sound');
+          stopAudio();
+          setAmbientSoundState('off');
+        });
+      });
   }, [isImmersive, volume]);
 
   const showControls = useCallback(() => {
