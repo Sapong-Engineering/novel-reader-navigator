@@ -225,6 +225,9 @@ const AdminPreferences = () => {
         </CardContent>
       </Card>
 
+      {/* Ambient Sounds */}
+      <AmbientSoundManager />
+
       {saving && (
         <div className="fixed bottom-4 right-4 bg-card border border-border rounded-lg px-3 py-2 shadow-lg flex items-center gap-2 text-sm text-muted-foreground">
           <Loader2 className="w-3 h-3 animate-spin" /> Saving...

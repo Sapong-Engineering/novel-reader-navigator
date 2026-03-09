@@ -59,7 +59,7 @@ export function useImmersiveMode() {
     const audio = new Audio();
     audio.loop = true;
     audio.volume = volume;
-    audio.src = SOUND_URLS[sound];
+    audio.src = getPublicUrl(sound);
     audio.play().catch((err) => {
       console.warn('Ambient sound playback failed:', err);
       toast.error('Could not play ambient sound');
