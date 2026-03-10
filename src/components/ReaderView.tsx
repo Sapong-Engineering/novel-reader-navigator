@@ -322,6 +322,12 @@ const ReaderView = ({
           onPlay={tts.play}
           onPause={tts.pause}
           onStop={tts.stop}
+          ttsEngine={tts.ttsEngine}
+          onEngineChange={tts.setTtsEngine}
+          aiVoices={tts.aiVoices}
+          selectedAiVoice={tts.selectedAiVoice}
+          onAiVoiceChange={tts.setSelectedAiVoice}
+          isAiLoading={tts.isAiLoading}
         />
       )}
 
