@@ -63,6 +63,17 @@ const ReaderView = ({
   const [scrollProgress, setScrollProgress] = useState(0);
   const [showLabelInput, setShowLabelInput] = useState(false);
   const [labelDraft, setLabelDraft] = useState('');
+  const isMobile = useIsMobile();
+
+  const { bindSwipe } = useSwipeNavigation({
+    onSwipeLeft: useCallback(() => { if (hasNext) onNextChapter?.(); }, [hasNext, onNextChapter]),
+    onSwipeRight: useCallback(() => { if (hasPrev) onPrevChapter?.(); }, [hasPrev, onPrevChapter]),
+    enabled: isMobile,
+  });
+
+  useEffect(() => {
+    return bindSwipe(scrollRef.current);
+  }, [bindSwipe]);
 
   useEffect(() => {
     const el = scrollRef.current;
