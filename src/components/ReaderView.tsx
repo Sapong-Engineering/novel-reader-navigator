@@ -1,4 +1,6 @@
-import { useRef, useEffect, useState } from 'react';
+import { useRef, useEffect, useState, useCallback } from 'react';
+import { useSwipeNavigation } from '@/hooks/useSwipeNavigation';
+import { useIsMobile } from '@/hooks/use-mobile';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { ChevronLeft, ChevronRight, Bookmark, BookmarkCheck, ArrowUp, ArrowDown, BookOpen } from 'lucide-react';
@@ -61,6 +63,17 @@ const ReaderView = ({
   const [scrollProgress, setScrollProgress] = useState(0);
   const [showLabelInput, setShowLabelInput] = useState(false);
   const [labelDraft, setLabelDraft] = useState('');
+  const isMobile = useIsMobile();
+
+  const { bindSwipe } = useSwipeNavigation({
+    onSwipeLeft: useCallback(() => { if (hasNext) onNextChapter?.(); }, [hasNext, onNextChapter]),
+    onSwipeRight: useCallback(() => { if (hasPrev) onPrevChapter?.(); }, [hasPrev, onPrevChapter]),
+    enabled: isMobile,
+  });
+
+  useEffect(() => {
+    return bindSwipe(scrollRef.current);
+  }, [bindSwipe]);
 
   useEffect(() => {
     const el = scrollRef.current;
