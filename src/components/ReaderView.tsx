@@ -38,6 +38,12 @@ interface ReaderViewProps {
     play: () => void;
     pause: () => void;
     stop: () => void;
+    ttsEngine: 'browser' | 'ai';
+    setTtsEngine: (e: 'browser' | 'ai') => void;
+    aiVoices: { id: string; name: string }[];
+    selectedAiVoice: string;
+    setSelectedAiVoice: (v: string) => void;
+    isAiLoading: boolean;
   };
 }
 
