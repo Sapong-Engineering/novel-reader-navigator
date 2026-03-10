@@ -1,9 +1,10 @@
-import { Play, Pause, Square, SkipForward, Volume2, Mic2 } from 'lucide-react';
+import { Play, Pause, Square, SkipForward, Volume2, Mic2, Sparkles, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
-import type { TTSSpeed } from '@/hooks/useTTS';
+import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
+import type { TTSSpeed, TTSEngine, AIVoice } from '@/hooks/useTTS';
 
 interface TTSControlsProps {
   isPlaying: boolean;
@@ -20,6 +21,13 @@ interface TTSControlsProps {
   onPlay: () => void;
   onPause: () => void;
   onStop: () => void;
+  // AI engine props
+  ttsEngine: TTSEngine;
+  onEngineChange: (e: TTSEngine) => void;
+  aiVoices: AIVoice[];
+  selectedAiVoice: string;
+  onAiVoiceChange: (v: string) => void;
+  isAiLoading?: boolean;
 }
 
 const speeds: TTSSpeed[] = [0.5, 0.75, 1, 1.25, 1.5, 2];
@@ -39,8 +47,15 @@ const TTSControls = ({
   onPlay,
   onPause,
   onStop,
+  ttsEngine,
+  onEngineChange,
+  aiVoices,
+  selectedAiVoice,
+  onAiVoiceChange,
+  isAiLoading = false,
 }: TTSControlsProps) => {
   const progress = totalParagraphs > 0 ? ((currentIndex + 1) / totalParagraphs) * 100 : 0;
+  const isAi = ttsEngine === 'ai';
 
   return (
     <div className="border-t border-border bg-card/90 backdrop-blur-sm">
@@ -53,6 +68,26 @@ const TTSControls = ({
       </div>
 
       <div className="px-3 sm:px-4 py-2 flex items-center gap-2 flex-wrap">
+        {/* Engine toggle */}
+        <ToggleGroup
+          type="single"
+          value={ttsEngine}
+          onValueChange={(v) => { if (v) onEngineChange(v as TTSEngine); }}
+          size="sm"
+          className="h-7"
+        >
+          <ToggleGroupItem value="browser" className="text-xs h-7 px-2 font-sans-ui">
+            <Volume2 className="w-3 h-3 mr-1" />
+            <span className="hidden sm:inline">Browser</span>
+          </ToggleGroupItem>
+          <ToggleGroupItem value="ai" className="text-xs h-7 px-2 font-sans-ui">
+            <Sparkles className="w-3 h-3 mr-1" />
+            AI
+          </ToggleGroupItem>
+        </ToggleGroup>
+
+        <div className="w-px h-5 bg-border mx-0.5 hidden sm:block" />
+
         {/* Play/Pause/Stop */}
         <div className="flex items-center gap-1">
           {isPlaying ? (
@@ -60,8 +95,12 @@ const TTSControls = ({
               <Pause className="w-4 h-4" />
             </Button>
           ) : (
-            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={onPlay} title={isPaused ? 'Resume' : 'Play'}>
-              <Play className="w-4 h-4" />
+            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={onPlay} title={isPaused ? 'Resume' : 'Play'} disabled={isAiLoading}>
+              {isAiLoading ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <Play className="w-4 h-4" />
+              )}
             </Button>
           )}
           <Button variant="ghost" size="icon" className="h-8 w-8" onClick={onStop} title="Stop" disabled={!isPlaying && !isPaused}>
@@ -88,19 +127,33 @@ const TTSControls = ({
           </SelectContent>
         </Select>
 
-        {/* Voice */}
-        {voices.length > 0 && (
-          <Select value={selectedVoice} onValueChange={onVoiceChange}>
-            <SelectTrigger className="h-7 w-[120px] text-xs font-sans-ui hidden sm:flex">
-              <Mic2 className="w-3 h-3 mr-1 flex-shrink-0" />
+        {/* Voice selector - conditional on engine */}
+        {isAi ? (
+          <Select value={selectedAiVoice} onValueChange={onAiVoiceChange}>
+            <SelectTrigger className="h-7 w-[100px] text-xs font-sans-ui hidden sm:flex">
+              <Sparkles className="w-3 h-3 mr-1 flex-shrink-0 text-primary" />
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              {voices.map(v => (
-                <SelectItem key={v.name} value={v.name} className="text-xs">{v.name.split(' ').slice(0, 3).join(' ')}</SelectItem>
+              {aiVoices.map(v => (
+                <SelectItem key={v.id} value={v.id} className="text-xs">{v.name}</SelectItem>
               ))}
             </SelectContent>
           </Select>
+        ) : (
+          voices.length > 0 && (
+            <Select value={selectedVoice} onValueChange={onVoiceChange}>
+              <SelectTrigger className="h-7 w-[120px] text-xs font-sans-ui hidden sm:flex">
+                <Mic2 className="w-3 h-3 mr-1 flex-shrink-0" />
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {voices.map(v => (
+                  <SelectItem key={v.name} value={v.name} className="text-xs">{v.name.split(' ').slice(0, 3).join(' ')}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )
         )}
 
         <div className="flex-1" />

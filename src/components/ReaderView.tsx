@@ -38,6 +38,12 @@ interface ReaderViewProps {
     play: () => void;
     pause: () => void;
     stop: () => void;
+    ttsEngine: 'browser' | 'ai';
+    setTtsEngine: (e: 'browser' | 'ai') => void;
+    aiVoices: { id: string; name: string }[];
+    selectedAiVoice: string;
+    setSelectedAiVoice: (v: string) => void;
+    isAiLoading: boolean;
   };
 }
 
@@ -316,6 +322,12 @@ const ReaderView = ({
           onPlay={tts.play}
           onPause={tts.pause}
           onStop={tts.stop}
+          ttsEngine={tts.ttsEngine}
+          onEngineChange={tts.setTtsEngine}
+          aiVoices={tts.aiVoices}
+          selectedAiVoice={tts.selectedAiVoice}
+          onAiVoiceChange={tts.setSelectedAiVoice}
+          isAiLoading={tts.isAiLoading}
         />
       )}
 
