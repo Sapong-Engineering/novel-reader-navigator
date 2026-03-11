@@ -9,6 +9,7 @@ const ADAPTER_SITE_MAP: Record<string, string> = {
   adapter_wuxiaclick: 'wuxia.click',
   adapter_novelbin: 'novelbin.com',
   adapter_empirenovel: 'empirenovel.com',
+  adapter_gutenberg: 'gutenberg.org',
 };
 
 Deno.serve(async (req) => {
