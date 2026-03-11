@@ -2,6 +2,8 @@ export interface ChapterInfo {
   id: string;
   title: string;
   url: string;
+  /** Pre-loaded content (e.g. Gutenberg books where all text comes in one fetch) */
+  content?: string;
 }
 
 export interface NovelInfo {

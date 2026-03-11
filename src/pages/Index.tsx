@@ -109,6 +109,7 @@ const Index = () => {
           id: ch.id,
           title: ch.title,
           url: ch.url,
+          ...(ch.content ? { content: ch.content, savedAt: new Date().toISOString() } : {}),
         }))),
         savedAt: new Date().toISOString(),
       };

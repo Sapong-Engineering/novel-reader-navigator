@@ -57,6 +57,7 @@ const ADAPTER_MAP: Record<string, string> = {
   adapter_wuxiaclick: 'WuxiaClick',
   adapter_novelbin: 'NovelBin',
   adapter_empirenovel: 'EmpireNovel',
+  adapter_gutenberg: 'Gutenberg',
 };
 
 export async function getActiveSources(): Promise<ActiveSource[]> {
