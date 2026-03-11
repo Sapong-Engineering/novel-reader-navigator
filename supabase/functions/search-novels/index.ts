@@ -9,6 +9,7 @@ const ADAPTER_SITE_MAP: Record<string, string> = {
   adapter_wuxiaclick: 'wuxia.click',
   adapter_novelbin: 'novelbin.com',
   adapter_empirenovel: 'empirenovel.com',
+  adapter_gutenberg: 'gutenberg.org',
 };
 
 Deno.serve(async (req) => {
@@ -114,25 +115,27 @@ Deno.serve(async (req) => {
       .map((item: any) => {
         const url = item.url || '';
         let source = 'unknown';
-        if (url.includes('novelbin.com')) source = 'NovelBin';
-        else if (url.includes('wuxia.click')) source = 'WuxiaClick';
-        else if (url.includes('empirenovel.com')) source = 'EmpireNovel';
+        let domain = '';
+        if (url.includes('novelbin.com')) { source = 'NovelBin'; domain = 'novelbin.com'; }
+        else if (url.includes('wuxia.click')) { source = 'WuxiaClick'; domain = 'wuxia.click'; }
+        else if (url.includes('empirenovel.com')) { source = 'EmpireNovel'; domain = 'empirenovel.com'; }
+        else if (url.includes('gutenberg.org')) { source = 'Gutenberg'; domain = 'gutenberg.org'; }
 
         if (source === 'unknown') return null;
-
-        const domain = source === 'NovelBin' ? 'novelbin.com' : source === 'WuxiaClick' ? 'wuxia.click' : 'empirenovel.com';
         if (!enabledSitesSet.has(domain)) return null;
 
         const isChapterPage = /chapter[-_\s]?\d/i.test(url) || /\/chapter\//i.test(url);
         const isUtilityPage = /\/(search|category|tag|login|register|contact|about|faq)\b/i.test(url);
         const isListPage = /\/novels-list/i.test(url) || /[?&]author=/i.test(url) || /[?&]category=/i.test(url);
-        if (isChapterPage || isUtilityPage || isListPage) return null;
+        // For Gutenberg, only keep /ebooks/ pages (not raw .txt files or cache paths)
+        const isGutenbergNonBook = source === 'Gutenberg' && !(/\/ebooks\/\d+/.test(url));
+        if (isChapterPage || isUtilityPage || isListPage || isGutenbergNonBook) return null;
 
         const cleanUrl = url.replace(/\?page=\d+/, '');
 
         return {
           title: (item.title || '')
-            .replace(/ - NovelBin| - WuxiaClick| - EmpireNovel| - Read| Online Free| Novel Full| read online \| Empire Novel| Light Novels/gi, '')
+            .replace(/ - NovelBin| - WuxiaClick| - EmpireNovel| - Read| Online Free| Novel Full| read online \| Empire Novel| Light Novels| - Free eBook \| Project Gutenberg| by .* - Project Gutenberg/gi, '')
             .trim(),
           url: cleanUrl,
           description: item.description || '',
