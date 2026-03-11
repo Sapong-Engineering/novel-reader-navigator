@@ -115,13 +115,13 @@ Deno.serve(async (req) => {
       .map((item: any) => {
         const url = item.url || '';
         let source = 'unknown';
-        if (url.includes('novelbin.com')) source = 'NovelBin';
-        else if (url.includes('wuxia.click')) source = 'WuxiaClick';
-        else if (url.includes('empirenovel.com')) source = 'EmpireNovel';
+        let domain = '';
+        if (url.includes('novelbin.com')) { source = 'NovelBin'; domain = 'novelbin.com'; }
+        else if (url.includes('wuxia.click')) { source = 'WuxiaClick'; domain = 'wuxia.click'; }
+        else if (url.includes('empirenovel.com')) { source = 'EmpireNovel'; domain = 'empirenovel.com'; }
+        else if (url.includes('gutenberg.org')) { source = 'Gutenberg'; domain = 'gutenberg.org'; }
 
         if (source === 'unknown') return null;
-
-        const domain = source === 'NovelBin' ? 'novelbin.com' : source === 'WuxiaClick' ? 'wuxia.click' : 'empirenovel.com';
         if (!enabledSitesSet.has(domain)) return null;
 
         const isChapterPage = /chapter[-_\s]?\d/i.test(url) || /\/chapter\//i.test(url);
