@@ -4,7 +4,7 @@ export interface NovelInfo {
   title: string;
   description: string;
   coverUrl?: string;
-  chapters: { id: string; title: string; url: string }[];
+  chapters: { id: string; title: string; url: string; content?: string }[];
 }
 
 export interface SearchResult {
