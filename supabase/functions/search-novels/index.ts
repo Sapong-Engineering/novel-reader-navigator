@@ -127,7 +127,9 @@ Deno.serve(async (req) => {
         const isChapterPage = /chapter[-_\s]?\d/i.test(url) || /\/chapter\//i.test(url);
         const isUtilityPage = /\/(search|category|tag|login|register|contact|about|faq)\b/i.test(url);
         const isListPage = /\/novels-list/i.test(url) || /[?&]author=/i.test(url) || /[?&]category=/i.test(url);
-        if (isChapterPage || isUtilityPage || isListPage) return null;
+        // For Gutenberg, only keep /ebooks/ pages (not raw .txt files or cache paths)
+        const isGutenbergNonBook = source === 'Gutenberg' && !(/\/ebooks\/\d+/.test(url));
+        if (isChapterPage || isUtilityPage || isListPage || isGutenbergNonBook) return null;
 
         const cleanUrl = url.replace(/\?page=\d+/, '');
 
