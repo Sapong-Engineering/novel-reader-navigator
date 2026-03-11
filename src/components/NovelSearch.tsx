@@ -15,6 +15,7 @@ const sourceColors: Record<string, string> = {
   NovelBin: 'bg-primary/10 text-primary border-primary/20',
   WuxiaClick: 'bg-accent/10 text-accent border-accent/20',
   EmpireNovel: 'bg-secondary text-secondary-foreground border-border',
+  Gutenberg: 'bg-muted text-muted-foreground border-border',
 };
 
 const NovelSearch = ({ onAddNovel, isAddingNovel }: NovelSearchProps) => {

@@ -133,7 +133,7 @@ Deno.serve(async (req) => {
 
         return {
           title: (item.title || '')
-            .replace(/ - NovelBin| - WuxiaClick| - EmpireNovel| - Read| Online Free| Novel Full| read online \| Empire Novel| Light Novels/gi, '')
+            .replace(/ - NovelBin| - WuxiaClick| - EmpireNovel| - Read| Online Free| Novel Full| read online \| Empire Novel| Light Novels| - Free eBook \| Project Gutenberg| by .* - Project Gutenberg/gi, '')
             .trim(),
           url: cleanUrl,
           description: item.description || '',
