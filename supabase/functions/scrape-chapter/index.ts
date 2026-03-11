@@ -1,6 +1,7 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { chapterContentCache, Cache } from '../shared/cache.ts';
 import { cleanChapterContent } from '../shared/chapter-cleaner.ts';
+import { isHostAllowed } from '../shared/allowed-hosts.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -46,33 +47,33 @@ Deno.serve(async (req) => {
       );
     }
 
-    const apiKey = Deno.env.get('FIRECRAWL_API_KEY');
-    if (!apiKey) {
-      return new Response(
-        JSON.stringify({ success: false, error: 'Firecrawl not configured' }),
-        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-
     let formattedUrl = url.trim();
     if (!formattedUrl.startsWith('http')) {
       formattedUrl = `https://${formattedUrl}`;
     }
 
-    // Validate URL is from an allowed source
-    const ALLOWED_HOSTS = new Set(['wuxia.click', 'www.wuxia.click', 'novelbin.com', 'www.novelbin.com', 'empirenovel.com', 'www.empirenovel.com']);
-    try {
-      const parsed = new URL(formattedUrl);
-      if (!ALLOWED_HOSTS.has(parsed.hostname)) {
-        return new Response(
-          JSON.stringify({ success: false, error: 'URL not from a supported source' }),
-          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
-      }
-    } catch {
+    // Validate URL against shared allowlist
+    const hostCheck = isHostAllowed(formattedUrl);
+    if (!hostCheck.allowed) {
       return new Response(
-        JSON.stringify({ success: false, error: 'Invalid URL' }),
+        JSON.stringify({ success: false, error: 'URL not from a supported source' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // Gutenberg chapters have inline content — they should never need scraping
+    if (/gutenberg\.org/i.test(formattedUrl)) {
+      return new Response(
+        JSON.stringify({ success: false, error: 'Gutenberg chapter content is embedded in the novel. Re-fetch the novel to reload chapter content.' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    const apiKey = Deno.env.get('FIRECRAWL_API_KEY');
+    if (!apiKey) {
+      return new Response(
+        JSON.stringify({ success: false, error: 'Firecrawl not configured' }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 

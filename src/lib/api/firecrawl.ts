@@ -4,7 +4,7 @@ export interface NovelInfo {
   title: string;
   description: string;
   coverUrl?: string;
-  chapters: { id: string; title: string; url: string }[];
+  chapters: { id: string; title: string; url: string; content?: string }[];
 }
 
 export interface SearchResult {
@@ -57,6 +57,7 @@ const ADAPTER_MAP: Record<string, string> = {
   adapter_wuxiaclick: 'WuxiaClick',
   adapter_novelbin: 'NovelBin',
   adapter_empirenovel: 'EmpireNovel',
+  adapter_gutenberg: 'Gutenberg',
 };
 
 export async function getActiveSources(): Promise<ActiveSource[]> {

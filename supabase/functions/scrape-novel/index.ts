@@ -3,7 +3,10 @@ import { AdapterRegistry } from './adapters/types.ts';
 import { DefaultAdapter } from './adapters/default-adapter.ts';
 import { WuxiaClickAdapter } from './adapters/wuxiaclick-adapter.ts';
 import { NovelBinAdapter } from './adapters/novelbin-adapter.ts';
+import { GutenbergAdapter, fetchGutenbergNovel } from './adapters/gutenberg-adapter.ts';
 import { novelInfoCache, Cache } from '../shared/cache.ts';
+import { isHostAllowed } from '../shared/allowed-hosts.ts';
+import { sanitizeMarkdown } from '../shared/sanitization.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -13,6 +16,7 @@ const corsHeaders = {
 const registry = new AdapterRegistry(new DefaultAdapter());
 registry.register(new WuxiaClickAdapter());
 registry.register(new NovelBinAdapter());
+registry.register(new GutenbergAdapter());
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -53,32 +57,16 @@ Deno.serve(async (req) => {
       );
     }
 
-    const apiKey = Deno.env.get('FIRECRAWL_API_KEY');
-    if (!apiKey) {
-      return new Response(
-        JSON.stringify({ success: false, error: 'Firecrawl not configured' }),
-        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-
     let formattedUrl = url.trim();
     if (!formattedUrl.startsWith('http')) {
       formattedUrl = `https://${formattedUrl}`;
     }
 
-    // Validate URL is from an allowed source
-    const ALLOWED_HOSTS = new Set(['wuxia.click', 'www.wuxia.click', 'novelbin.com', 'www.novelbin.com', 'empirenovel.com', 'www.empirenovel.com']);
-    try {
-      const parsed = new URL(formattedUrl);
-      if (!ALLOWED_HOSTS.has(parsed.hostname)) {
-        return new Response(
-          JSON.stringify({ success: false, error: 'URL not from a supported source' }),
-          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
-      }
-    } catch {
+    // Validate URL against shared allowlist
+    const hostCheck = isHostAllowed(formattedUrl);
+    if (!hostCheck.allowed) {
       return new Response(
-        JSON.stringify({ success: false, error: 'Invalid URL' }),
+        JSON.stringify({ success: false, error: 'URL not from a supported source' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
@@ -91,6 +79,32 @@ Deno.serve(async (req) => {
       return new Response(
         JSON.stringify({ success: true, data: cached }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // Special handling for Gutenberg — fetch .txt directly, no Firecrawl needed
+    if (/gutenberg\.org/i.test(formattedUrl)) {
+      const novelInfo = await fetchGutenbergNovel(formattedUrl);
+
+      // Sanitize text fields
+      novelInfo.title = sanitizeMarkdown(novelInfo.title);
+      novelInfo.description = sanitizeMarkdown(novelInfo.description);
+
+      novelInfoCache.set(cacheKey, novelInfo);
+      console.log(`Gutenberg: Found ${novelInfo.chapters.length} chapters for "${novelInfo.title}"`);
+
+      return new Response(
+        JSON.stringify({ success: true, data: novelInfo }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // Standard Firecrawl flow for other sources
+    const apiKey = Deno.env.get('FIRECRAWL_API_KEY');
+    if (!apiKey) {
+      return new Response(
+        JSON.stringify({ success: false, error: 'Firecrawl not configured' }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
@@ -129,6 +143,16 @@ Deno.serve(async (req) => {
       markdown,
       links,
       metadata,
+    });
+
+    // Sanitize title and description to prevent XSS
+    novelInfo.title = sanitizeMarkdown(novelInfo.title);
+    novelInfo.description = sanitizeMarkdown(novelInfo.description);
+
+    // Validate that generated chapter URLs are against the allowlist
+    novelInfo.chapters = novelInfo.chapters.filter(ch => {
+      const check = isHostAllowed(ch.url);
+      return check.allowed;
     });
 
     console.log(`Found ${novelInfo.chapters.length} chapters for "${novelInfo.title}"`);
