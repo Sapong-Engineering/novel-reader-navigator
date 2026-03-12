@@ -120,7 +120,7 @@ const NotificationCenter = () => {
           )}
         </Button>
       </PopoverTrigger>
-      <PopoverContent align="end" className="w-80 p-0">
+      <PopoverContent align="end" className="w-[min(320px,90vw)] p-0">
         <div className="flex items-center justify-between px-4 py-3 border-b border-border">
           <h3 className="text-sm font-semibold font-sans-ui">Notifications</h3>
           <div className="flex gap-1">

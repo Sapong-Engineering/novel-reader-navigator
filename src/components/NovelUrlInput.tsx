@@ -22,10 +22,10 @@ const NovelUrlInput = ({ onSubmit, isLoading }: NovelUrlInputProps) => {
         <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-primary/10 mb-4">
           <BookOpen className="w-8 h-8 text-primary" aria-hidden="true" />
         </div>
-        <h1 className="text-3xl font-bold font-sans-ui tracking-tight mb-2">
+        <h1 className="text-2xl sm:text-3xl font-bold font-sans-ui tracking-tight mb-2">
           Novel Reader
         </h1>
-        <p className="text-muted-foreground font-sans-ui">
+        <p className="text-sm sm:text-base text-muted-foreground font-sans-ui">
           Paste a novel URL to start reading, saving, and downloading chapters
         </p>
       </div>
@@ -43,11 +43,14 @@ const NovelUrlInput = ({ onSubmit, isLoading }: NovelUrlInputProps) => {
             required
           />
         </div>
-        <Button type="submit" disabled={isLoading} className="h-12 px-6 font-sans-ui">
+        <Button type="submit" disabled={isLoading} className="h-12 px-4 sm:px-6 font-sans-ui">
           {isLoading ? (
             <Loader2 className="w-4 h-4 animate-spin" />
           ) : (
-            'Fetch Novel'
+            <>
+              <span className="hidden sm:inline">Fetch Novel</span>
+              <span className="sm:hidden">Fetch</span>
+            </>
           )}
         </Button>
       </form>

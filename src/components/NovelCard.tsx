@@ -81,7 +81,7 @@ const NovelCard = ({ novel, onOpen, onDelete, lists = [], selectedListIds = [], 
           <Button
             variant="ghost"
             size="icon"
-            className="absolute top-2 right-2 h-7 w-7 bg-background/80 backdrop-blur-sm opacity-0 group-hover:opacity-100 focus-visible:opacity-100 transition-opacity text-destructive hover:text-destructive"
+            className="absolute top-2 right-2 h-7 w-7 bg-background/80 backdrop-blur-sm opacity-100 sm:opacity-0 sm:group-hover:opacity-100 focus-visible:opacity-100 transition-opacity text-destructive hover:text-destructive"
             aria-label={`Delete ${novel.title}`}
             onClick={(e) => e.stopPropagation()}
           >

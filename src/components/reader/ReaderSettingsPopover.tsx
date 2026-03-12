@@ -30,7 +30,7 @@ export function ReaderSettingsPopover({ onRepairChapterOrder }: ReaderSettingsPo
           <span className="text-sm font-semibold tracking-tight leading-none">Aa</span>
         </Button>
       </PopoverTrigger>
-      <PopoverContent className="w-56 p-3 space-y-3" align="end">
+      <PopoverContent className="w-[min(240px,90vw)] p-3 space-y-3" align="end">
         {/* Font size */}
         <div>
           <p className="text-xs text-muted-foreground font-sans-ui mb-1.5">Font size</p>

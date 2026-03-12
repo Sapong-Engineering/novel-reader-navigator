@@ -288,17 +288,17 @@ const ReaderView = ({
             value={labelDraft}
             onChange={e => setLabelDraft(e.target.value)}
             placeholder="Bookmark label (optional)"
-            className="h-7 text-sm font-sans-ui flex-1"
+            className="h-9 text-sm font-sans-ui flex-1"
             onKeyDown={e => {
               if (e.key === 'Enter') handleConfirmBookmark();
               if (e.key === 'Escape') handleCancelBookmark();
             }}
             autoFocus
           />
-          <Button size="sm" className="h-7 text-xs font-sans-ui" onClick={handleConfirmBookmark}>
+          <Button size="sm" className="h-9 text-xs font-sans-ui" onClick={handleConfirmBookmark}>
             Save
           </Button>
-          <Button size="sm" variant="ghost" className="h-7 text-xs font-sans-ui" onClick={handleCancelBookmark}>
+          <Button size="sm" variant="ghost" className="h-9 text-xs font-sans-ui" onClick={handleCancelBookmark}>
             Cancel
           </Button>
         </div>

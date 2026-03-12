@@ -181,7 +181,7 @@ const ChapterList = ({
                     <Button
                       variant="ghost"
                       size="icon"
-                      className="h-6 w-6 opacity-0 group-hover:opacity-100 focus-visible:opacity-100 flex-shrink-0 mt-0.5"
+                      className="h-7 w-7 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 focus-visible:opacity-100 flex-shrink-0 mt-0.5"
                       onClick={() => onRemoveBookmark?.(bookmark.id)}
                       aria-label={`Remove bookmark for ${bookmark.label || bookmark.chapterTitle}`}
                     >
