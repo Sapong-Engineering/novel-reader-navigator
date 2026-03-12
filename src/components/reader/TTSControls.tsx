@@ -157,10 +157,10 @@ const TTSControls = ({
           </SelectContent>
         </Select>
 
-        {/* Voice selector - conditional on engine */}
+        {/* Voice selector — always visible, wraps to second row on narrow screens */}
         {isAi ? (
           <Select value={selectedAiVoice} onValueChange={onAiVoiceChange}>
-            <SelectTrigger className="h-7 w-[100px] text-xs font-sans-ui hidden sm:flex">
+            <SelectTrigger className="h-7 w-[100px] text-xs font-sans-ui flex">
               <Sparkles className="w-3 h-3 mr-1 flex-shrink-0 text-primary" />
               <SelectValue />
             </SelectTrigger>
@@ -173,7 +173,7 @@ const TTSControls = ({
         ) : (
           voices.length > 0 && (
             <Select value={selectedVoice} onValueChange={onVoiceChange}>
-              <SelectTrigger className="h-7 w-[120px] text-xs font-sans-ui hidden sm:flex">
+              <SelectTrigger className="h-7 w-[120px] text-xs font-sans-ui flex">
                 <Mic2 className="w-3 h-3 mr-1 flex-shrink-0" />
                 <SelectValue />
               </SelectTrigger>
@@ -188,13 +188,12 @@ const TTSControls = ({
 
         <div className="flex-1" />
 
-        {/* Auto-advance */}
+        {/* Auto-advance — label always visible */}
         <div className="flex items-center gap-1.5">
-          <Label htmlFor="tts-auto" className="text-xs text-muted-foreground font-sans-ui hidden sm:inline">
+          <Label htmlFor="tts-auto" className="text-xs text-muted-foreground font-sans-ui">
             Auto-next
           </Label>
           <Switch id="tts-auto" checked={autoAdvance} onCheckedChange={onAutoAdvanceChange} className="scale-75" />
-          <SkipForward className={`w-3.5 h-3.5 sm:hidden ${autoAdvance ? 'text-primary' : 'text-muted-foreground'}`} />
         </div>
       </div>
     </div>

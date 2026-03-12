@@ -255,8 +255,8 @@ const ReaderView = ({
         </div>
       </div>
 
-      {/* Floating scroll buttons */}
-      <div className="absolute right-4 bottom-24 flex flex-col gap-2 z-10">
+      {/* Floating scroll buttons — shift up when TTS bar is visible to avoid overlap */}
+      <div className={`absolute right-4 flex flex-col gap-2 z-10 ${tts && chapter.content ? 'bottom-36' : 'bottom-24'}`}>
         {showScrollTop && (
           <Button
             variant="secondary"
