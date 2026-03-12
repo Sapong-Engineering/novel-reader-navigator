@@ -21,6 +21,19 @@ import { scrapeChapterContent } from '@/lib/api/firecrawl';
 import { orderChapters } from '@/lib/chapter-order';
 import { useAppSettings } from '@/contexts/AppSettingsContext';
 import { startFetchAll, cancelFetchAll, getFetchAllState, subscribeFetchAll, getBackgroundNovel } from '@/lib/background-fetch';
+import { Button } from '@/components/ui/button';
+import { PanelLeftOpen } from 'lucide-react';
+
+const DESKTOP_SIDEBAR_STORAGE_KEY = 'reader-desktop-sidebar-open';
+
+function getInitialDesktopSidebarState() {
+  try {
+    const stored = localStorage.getItem(DESKTOP_SIDEBAR_STORAGE_KEY);
+    return stored === null ? true : stored === 'true';
+  } catch {
+    return true;
+  }
+}
 
 const Reader = () => {
   const { novelId } = useParams<{ novelId: string }>();
@@ -28,6 +41,7 @@ const Reader = () => {
   const [novel, setNovel] = useState<Novel | null>(null);
   const [activeChapter, setActiveChapter] = useState<Chapter | null>(null);
   const [isLoadingChapter, setIsLoadingChapter] = useState(false);
+  const [isDesktopSidebarOpen, setIsDesktopSidebarOpen] = useState<boolean>(getInitialDesktopSidebarState);
   const pendingScrollRef = useRef<number | null>(null);
   const forceScrollTopRef = useRef(false);
 
@@ -87,16 +101,22 @@ const Reader = () => {
   } = useBookmarks(novelIdStr);
 
   useEffect(() => {
+    try {
+      localStorage.setItem(DESKTOP_SIDEBAR_STORAGE_KEY, String(isDesktopSidebarOpen));
+    } catch {}
+  }, [isDesktopSidebarOpen]);
+
+  useEffect(() => {
     if (!novelId) return;
 
     const stored = getNovel(novelId);
     if (stored) {
       setNovel(stored);
-      const lastReadId = getLastRead();
-      if (lastReadId) {
+      getLastRead().then((lastReadId) => {
+        if (!lastReadId) return;
         const lastChapter = stored.chapters.find(c => c.id === lastReadId);
         if (lastChapter) setActiveChapter(lastChapter);
-      }
+      });
     } else {
       toast.error('Novel not found in library. Please go back and try again.');
       navigate('/');
@@ -123,7 +143,11 @@ const Reader = () => {
         });
       }
     });
-  }, [novelId, navigate, appSettings.syncEnabled]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [novelId, navigate, appSettings.syncEnabled, getLastRead]);
+
+  const toggleDesktopSidebar = useCallback(() => {
+    setIsDesktopSidebarOpen(prev => !prev);
+  }, []);
 
   async function handleSelectChapter(chapter: Chapter) {
     // Stop TTS when changing chapters
@@ -189,18 +213,18 @@ const Reader = () => {
 
   const handleChapterReady = useCallback(
     async (container: HTMLElement) => {
+      const pending = pendingScrollRef.current;
+      if (pending !== null) {
+        pendingScrollRef.current = null;
+        container.scrollTop = pending;
+        return;
+      }
       if (forceScrollTopRef.current) {
         forceScrollTopRef.current = false;
         container.scrollTop = 0;
         return;
       }
-      const pending = pendingScrollRef.current;
-      if (pending !== null) {
-        pendingScrollRef.current = null;
-        container.scrollTop = pending;
-      } else {
-        await restoreProgress(container);
-      }
+      await restoreProgress(container);
     },
     [restoreProgress],
   );
@@ -323,6 +347,8 @@ const Reader = () => {
           onRepairChapterOrder={handleRepairChapterOrder}
           showReaderSettings
           onImmersiveMode={immersive.enter}
+          isDesktopSidebarOpen={isDesktopSidebarOpen}
+          onToggleDesktopSidebar={toggleDesktopSidebar}
           mobileChapterDrawer={
             <MobileChapterDrawer
               chapters={orderedChapters}
@@ -337,19 +363,39 @@ const Reader = () => {
         />
       </div>
       <div className="flex-1 flex overflow-hidden">
-        <div className={`w-72 border-r border-border bg-card flex-shrink-0 hidden md:flex flex-col transition-all duration-500 ${immersive.isImmersive ? '!hidden' : ''}`}>
-          <ErrorBoundary>
-            <ChapterList
-              chapters={orderedChapters}
-              activeChapterId={activeChapter?.id}
-              onSelectChapter={handleSelectChapter}
-              bookmarks={bookmarks}
-              onJumpToBookmark={handleJumpToBookmark}
-              onRemoveBookmark={handleRemoveBookmark}
-              bookmarkedChapterIds={bookmarkedChapterIds}
-            />
-          </ErrorBoundary>
-        </div>
+        {!immersive.isImmersive && (
+          <div
+            className={`border-r border-border bg-card flex-shrink-0 hidden md:flex transition-all duration-300 ${
+              isDesktopSidebarOpen ? 'w-72 flex-col' : 'w-14 items-start justify-center'
+            }`}
+          >
+            {isDesktopSidebarOpen ? (
+              <ErrorBoundary>
+                <ChapterList
+                  chapters={orderedChapters}
+                  activeChapterId={activeChapter?.id}
+                  onSelectChapter={handleSelectChapter}
+                  bookmarks={bookmarks}
+                  onJumpToBookmark={handleJumpToBookmark}
+                  onRemoveBookmark={handleRemoveBookmark}
+                  bookmarkedChapterIds={bookmarkedChapterIds}
+                />
+              </ErrorBoundary>
+            ) : (
+              <div className="w-full h-full flex items-start justify-center pt-3">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={toggleDesktopSidebar}
+                  aria-label="Expand chapter sidebar"
+                  title="Expand chapter sidebar"
+                >
+                  <PanelLeftOpen className="w-4 h-4" />
+                </Button>
+              </div>
+            )}
+          </div>
+        )}
         <div className="flex-1 flex flex-col">
           <ErrorBoundary>
             <ReaderView

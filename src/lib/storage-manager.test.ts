@@ -1,8 +1,10 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import {
   getReadingProgress,
+  getReadingProgressEntry,
   saveReadingProgress,
   getLastReadChapter,
+  getLastReadChapterEntry,
   saveLastReadChapter,
   calculateNovelSize,
 } from './storage-manager';
@@ -32,6 +34,13 @@ describe('saveReadingProgress / getReadingProgress', () => {
     expect(pos).toBe(350);
   });
 
+  it('stores a timestamped progress payload', async () => {
+    saveReadingProgress('novel-1', 'ch-1', 350);
+    const entry = await getReadingProgressEntry('novel-1', 'ch-1');
+    expect(entry.scrollPosition).toBe(350);
+    expect(entry.updatedAt).toEqual(expect.any(String));
+  });
+
   it('returns 0 for unknown chapter', async () => {
     const pos = await getReadingProgress('novel-x', 'ch-x');
     expect(pos).toBe(0);
@@ -41,6 +50,18 @@ describe('saveReadingProgress / getReadingProgress', () => {
     saveReadingProgress('novel-1', 'ch-1', 0);
     const pos = await getReadingProgress('novel-1', 'ch-1');
     expect(pos).toBe(0);
+  });
+
+  it('reads legacy numeric progress values', async () => {
+    localStorage.setItem('reading-progress:novel-1:ch-1', '125');
+    const entry = await getReadingProgressEntry('novel-1', 'ch-1');
+    expect(entry).toEqual({ scrollPosition: 125, updatedAt: null });
+  });
+
+  it('falls back safely on malformed progress values', async () => {
+    localStorage.setItem('reading-progress:novel-1:ch-1', '{bad json');
+    const entry = await getReadingProgressEntry('novel-1', 'ch-1');
+    expect(entry).toEqual({ scrollPosition: 0, updatedAt: null });
   });
 });
 
@@ -52,6 +73,13 @@ describe('saveLastReadChapter / getLastReadChapter', () => {
     expect(getLastReadChapter('novel-1')).toBe('ch-5');
   });
 
+  it('stores a timestamped last-read payload', () => {
+    saveLastReadChapter('novel-1', 'ch-5');
+    const entry = getLastReadChapterEntry('novel-1');
+    expect(entry.chapterId).toBe('ch-5');
+    expect(entry.updatedAt).toEqual(expect.any(String));
+  });
+
   it('returns null when none saved', () => {
     expect(getLastReadChapter('novel-unknown')).toBeNull();
   });
@@ -60,6 +88,11 @@ describe('saveLastReadChapter / getLastReadChapter', () => {
     saveLastReadChapter('novel-1', 'ch-1');
     saveLastReadChapter('novel-1', 'ch-10');
     expect(getLastReadChapter('novel-1')).toBe('ch-10');
+  });
+
+  it('reads legacy string last-read values', () => {
+    localStorage.setItem('last-read:novel-1', 'ch-7');
+    expect(getLastReadChapterEntry('novel-1')).toEqual({ chapterId: 'ch-7', updatedAt: null });
   });
 });
 

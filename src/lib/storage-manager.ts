@@ -8,6 +8,16 @@ export interface StorageQuota {
   isExceeded: boolean;
 }
 
+export interface ReadingProgressEntry {
+  scrollPosition: number;
+  updatedAt: string | null;
+}
+
+export interface LastReadChapterEntry {
+  chapterId: string | null;
+  updatedAt: string | null;
+}
+
 const WARNING_THRESHOLD = 0.8; // 80%
 const STORAGE_KEY = 'novel-reader-library';
 
@@ -114,9 +124,37 @@ export async function getReadingProgress(
   novelId: string,
   chapterId: string,
 ): Promise<number> {
+  const entry = await getReadingProgressEntry(novelId, chapterId);
+  return entry.scrollPosition;
+}
+
+export async function getReadingProgressEntry(
+  novelId: string,
+  chapterId: string,
+): Promise<ReadingProgressEntry> {
   const key = `reading-progress:${novelId}:${chapterId}`;
   const stored = localStorage.getItem(key);
-  return stored ? parseFloat(stored) : 0;
+  if (!stored) return { scrollPosition: 0, updatedAt: null };
+
+  try {
+    const parsed = JSON.parse(stored);
+    if (typeof parsed === 'number') {
+      return { scrollPosition: parsed, updatedAt: null };
+    }
+    if (parsed && typeof parsed === 'object') {
+      return {
+        scrollPosition: typeof parsed.scrollPosition === 'number' ? parsed.scrollPosition : 0,
+        updatedAt: typeof parsed.updatedAt === 'string' ? parsed.updatedAt : null,
+      };
+    }
+  } catch {
+    const numeric = parseFloat(stored);
+    if (!Number.isNaN(numeric)) {
+      return { scrollPosition: numeric, updatedAt: null };
+    }
+  }
+
+  return { scrollPosition: 0, updatedAt: null };
 }
 
 export function saveReadingProgress(
@@ -125,13 +163,41 @@ export function saveReadingProgress(
   scrollPosition: number,
 ): void {
   const key = `reading-progress:${novelId}:${chapterId}`;
-  localStorage.setItem(key, String(scrollPosition));
+  localStorage.setItem(key, JSON.stringify({
+    scrollPosition,
+    updatedAt: new Date().toISOString(),
+  }));
 }
 
 export function getLastReadChapter(novelId: string): string | null {
-  return localStorage.getItem(`last-read:${novelId}`);
+  return getLastReadChapterEntry(novelId).chapterId;
+}
+
+export function getLastReadChapterEntry(novelId: string): LastReadChapterEntry {
+  const stored = localStorage.getItem(`last-read:${novelId}`);
+  if (!stored) return { chapterId: null, updatedAt: null };
+
+  try {
+    const parsed = JSON.parse(stored);
+    if (typeof parsed === 'string') {
+      return { chapterId: parsed, updatedAt: null };
+    }
+    if (parsed && typeof parsed === 'object') {
+      return {
+        chapterId: typeof parsed.chapterId === 'string' ? parsed.chapterId : null,
+        updatedAt: typeof parsed.updatedAt === 'string' ? parsed.updatedAt : null,
+      };
+    }
+  } catch {
+    return { chapterId: stored, updatedAt: null };
+  }
+
+  return { chapterId: null, updatedAt: null };
 }
 
 export function saveLastReadChapter(novelId: string, chapterId: string): void {
-  localStorage.setItem(`last-read:${novelId}`, chapterId);
+  localStorage.setItem(`last-read:${novelId}`, JSON.stringify({
+    chapterId,
+    updatedAt: new Date().toISOString(),
+  }));
 }

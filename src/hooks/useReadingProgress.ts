@@ -1,15 +1,31 @@
 import { useEffect, useCallback, useRef } from 'react';
 import {
   saveReadingProgress,
-  getReadingProgress,
+  getReadingProgressEntry,
   saveLastReadChapter,
-  getLastReadChapter,
+  getLastReadChapterEntry,
 } from '@/lib/storage-manager';
+import {
+  fetchLastReadingPositionFromBackend,
+  fetchReadingPositionForChapterFromBackend,
+} from '@/lib/sync-service';
 
 export interface UseReadingProgressResult {
   saveProgress: (scrollTop: number) => void;
   restoreProgress: (container: HTMLElement) => Promise<void>;
-  getLastRead: () => string | null;
+  getLastRead: () => Promise<string | null>;
+  getPreferredScrollPosition: (chapterId: string) => Promise<number>;
+}
+
+function selectNewest<T extends { updatedAt: string | null }>(local: T | null, remote: T | null): T | null {
+  if (!local) return remote;
+  if (!remote) return local;
+  if (!local.updatedAt && remote.updatedAt) return remote;
+  if (!remote.updatedAt) return local;
+  if (!local.updatedAt && !remote.updatedAt) return local;
+  return new Date(remote.updatedAt!).getTime() > new Date(local.updatedAt!).getTime()
+    ? remote
+    : local;
 }
 
 export function useReadingProgress(
@@ -40,16 +56,49 @@ export function useReadingProgress(
   const restoreProgress = useCallback(
     async (container: HTMLElement) => {
       if (!chapterId) return;
-      const scrollTop = await getReadingProgress(novelId, chapterId);
+      const scrollTop = await getPreferredScrollPosition(chapterId);
       if (scrollTop > 0) {
         container.scrollTop = scrollTop;
       }
     },
-    [novelId, chapterId],
+    [chapterId],
   );
 
   const getLastRead = useCallback(
-    () => getLastReadChapter(novelId),
+    async () => {
+      const local = getLastReadChapterEntry(novelId);
+      const remote = await fetchLastReadingPositionFromBackend(novelId);
+
+      const preferred = selectNewest(
+        local.chapterId ? { chapterId: local.chapterId, updatedAt: local.updatedAt } : null,
+        remote ? { chapterId: remote.chapterLocalId, updatedAt: remote.updatedAt } : null,
+      );
+
+      if (!preferred?.chapterId) return null;
+      if (remote && preferred.chapterId === remote.chapterLocalId) {
+        saveLastReadChapter(novelId, remote.chapterLocalId);
+      }
+      return preferred.chapterId;
+    },
+    [novelId],
+  );
+
+  const getPreferredScrollPosition = useCallback(
+    async (targetChapterId: string) => {
+      const local = await getReadingProgressEntry(novelId, targetChapterId);
+      const remote = await fetchReadingPositionForChapterFromBackend(novelId, targetChapterId);
+
+      const preferred = selectNewest(
+        { scrollPosition: local.scrollPosition, updatedAt: local.updatedAt },
+        remote ? { scrollPosition: remote.scrollPosition, updatedAt: remote.updatedAt } : null,
+      );
+
+      if (!preferred) return 0;
+      if (remote && preferred.updatedAt === remote.updatedAt) {
+        saveReadingProgress(novelId, targetChapterId, remote.scrollPosition);
+      }
+      return preferred.scrollPosition;
+    },
     [novelId],
   );
 
@@ -60,5 +109,5 @@ export function useReadingProgress(
     };
   }, []);
 
-  return { saveProgress, restoreProgress, getLastRead };
+  return { saveProgress, restoreProgress, getLastRead, getPreferredScrollPosition };
 }

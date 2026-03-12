@@ -1,7 +1,6 @@
 import { supabase } from '@/integrations/supabase/client';
 import { type Novel, type Chapter, getLibrary, saveNovel, getNovel, deleteNovel as deleteLocalNovel } from './novel-store';
 import { getBookmarks, type Bookmark } from './bookmarks';
-import { getReadingProgress, saveReadingProgress, getLastReadChapter, saveLastReadChapter } from './storage-manager';
 import { setSyncStatus } from '@/hooks/useSyncStatus';
 import { enqueue, dequeue, getQueueLength, onConnectivityChange } from './offline-queue';
 import { compareChapterOrder, orderChapters } from './chapter-order';
@@ -54,6 +53,18 @@ async function getUserId(): Promise<string | null> {
 
 let progressTimer: ReturnType<typeof setTimeout> | null = null;
 let pendingProgress: { novelLocalId: string; chapterLocalId: string; scrollPosition: number; isLastRead: boolean } | null = null;
+
+export interface RemoteReadingPosition {
+  chapterLocalId: string;
+  scrollPosition: number;
+  updatedAt: string;
+}
+
+export interface RemoteChapterProgress {
+  chapterLocalId: string;
+  scrollPosition: number;
+  updatedAt: string;
+}
 
 function flushProgressSync() {
   if (!pendingProgress) return;
@@ -114,6 +125,71 @@ async function _syncProgressToBackend(
   } catch (err) {
     console.error('Failed to sync progress:', err);
     enqueue('syncProgress', { novelLocalId, chapterLocalId, scrollPosition, isLastRead });
+  }
+}
+
+export async function fetchLastReadingPositionFromBackend(
+  novelLocalId: string,
+): Promise<RemoteReadingPosition | null> {
+  if (!isSyncEnabled()) return null;
+  const userId = await getUserId();
+  if (!userId) return null;
+
+  try {
+    const novelUuid = await resolveNovelUuid(novelLocalId, userId);
+    if (!novelUuid) return null;
+
+    const { data, error } = await supabase
+      .from('reading_progress')
+      .select('chapter_local_id, scroll_position, updated_at')
+      .eq('novel_id', novelUuid)
+      .eq('user_id', userId)
+      .eq('is_last_read', true)
+      .maybeSingle();
+
+    if (error || !data) return null;
+
+    return {
+      chapterLocalId: data.chapter_local_id,
+      scrollPosition: data.scroll_position ?? 0,
+      updatedAt: data.updated_at,
+    };
+  } catch (err) {
+    console.error('Failed to fetch last reading position:', err);
+    return null;
+  }
+}
+
+export async function fetchReadingPositionForChapterFromBackend(
+  novelLocalId: string,
+  chapterLocalId: string,
+): Promise<RemoteChapterProgress | null> {
+  if (!isSyncEnabled()) return null;
+  const userId = await getUserId();
+  if (!userId) return null;
+
+  try {
+    const novelUuid = await resolveNovelUuid(novelLocalId, userId);
+    if (!novelUuid) return null;
+
+    const { data, error } = await supabase
+      .from('reading_progress')
+      .select('chapter_local_id, scroll_position, updated_at')
+      .eq('novel_id', novelUuid)
+      .eq('user_id', userId)
+      .eq('chapter_local_id', chapterLocalId)
+      .maybeSingle();
+
+    if (error || !data) return null;
+
+    return {
+      chapterLocalId: data.chapter_local_id,
+      scrollPosition: data.scroll_position ?? 0,
+      updatedAt: data.updated_at,
+    };
+  } catch (err) {
+    console.error('Failed to fetch chapter reading position:', err);
+    return null;
   }
 }
 

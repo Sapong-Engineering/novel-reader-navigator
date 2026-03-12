@@ -1,7 +1,7 @@
 import { ReactNode } from 'react';
 import { Button } from '@/components/ui/button';
 import SyncIndicator from '@/components/SyncIndicator';
-import { Download, FileText, Save, BookOpen, Loader2, CloudDownload, Maximize2 } from 'lucide-react';
+import { Download, FileText, Save, BookOpen, Loader2, CloudDownload, Maximize2, PanelLeftClose, PanelLeftOpen } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -25,6 +25,8 @@ interface NovelToolbarProps {
   isFetchingAll?: boolean;
   fetchProgress?: { current: number; total: number };
   mobileChapterDrawer?: ReactNode;
+  isDesktopSidebarOpen?: boolean;
+  onToggleDesktopSidebar?: () => void;
   showReaderSettings?: boolean;
   onSync?: () => void;
   onRepairChapterOrder?: () => void;
@@ -43,6 +45,8 @@ const NovelToolbar = ({
   isFetchingAll,
   fetchProgress,
   mobileChapterDrawer,
+  isDesktopSidebarOpen,
+  onToggleDesktopSidebar,
   showReaderSettings = false,
   onSync,
   onRepairChapterOrder,
@@ -54,6 +58,20 @@ const NovelToolbar = ({
     <div className="border-b border-border bg-card/80 backdrop-blur-sm">
       <div className="h-14 flex items-center px-3 sm:px-4 gap-2 sm:gap-3">
         {mobileChapterDrawer}
+
+        {onToggleDesktopSidebar && (
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={onToggleDesktopSidebar}
+            aria-label={isDesktopSidebarOpen ? 'Collapse chapter sidebar' : 'Expand chapter sidebar'}
+            aria-pressed={isDesktopSidebarOpen}
+            className="hidden md:inline-flex"
+            title={isDesktopSidebarOpen ? 'Collapse chapter sidebar' : 'Expand chapter sidebar'}
+          >
+            {isDesktopSidebarOpen ? <PanelLeftClose className="w-4 h-4" /> : <PanelLeftOpen className="w-4 h-4" />}
+          </Button>
+        )}
 
         <Button variant="ghost" size="sm" onClick={onBack} className="font-sans-ui hidden sm:inline-flex">
           <BookOpen className="w-4 h-4 mr-2" />

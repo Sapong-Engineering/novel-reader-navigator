@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -39,8 +39,24 @@ const ChapterList = ({
   bookmarkedChapterIds = new Set(),
 }: ChapterListProps) => {
   const [activeTab, setActiveTab] = useState<Tab>('chapters');
+  const chapterButtonRefs = useRef(new Map<string, HTMLButtonElement>());
+  const didAutoScrollRef = useRef(false);
   const { searchQuery, setSearchQuery, filteredChapters, resultCount, clearSearch, getHighlightSegments } =
     useChapterSearch(chapters);
+
+  useEffect(() => {
+    if (activeTab !== 'chapters' || !activeChapterId) return;
+    if (!filteredChapters.some(chapter => chapter.id === activeChapterId)) return;
+
+    const target = chapterButtonRefs.current.get(activeChapterId);
+    if (!target) return;
+
+    target.scrollIntoView({
+      block: 'nearest',
+      behavior: didAutoScrollRef.current ? 'smooth' : 'auto',
+    });
+    didAutoScrollRef.current = true;
+  }, [activeChapterId, activeTab, filteredChapters]);
 
   return (
     <div className="flex flex-col h-full overflow-hidden">
@@ -112,6 +128,13 @@ const ChapterList = ({
               {filteredChapters.map((chapter) => (
                 <button
                   key={chapter.id}
+                  ref={(node) => {
+                    if (node) {
+                      chapterButtonRefs.current.set(chapter.id, node);
+                    } else {
+                      chapterButtonRefs.current.delete(chapter.id);
+                    }
+                  }}
                   onClick={() => onSelectChapter(chapter)}
                   aria-current={activeChapterId === chapter.id ? 'true' : undefined}
                   className={`w-full text-left px-3 py-2.5 rounded-lg mb-0.5 font-sans-ui text-sm transition-colors
