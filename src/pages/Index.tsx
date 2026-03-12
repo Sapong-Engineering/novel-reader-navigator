@@ -38,6 +38,7 @@ const Index = () => {
   const [isLoadingNovel, setIsLoadingNovel] = useState(false);
   const [library, setLibrary] = useState<Novel[]>(() => getLibrary());
   const [isSyncing, setIsSyncing] = useState(false);
+  const [isInitialSyncLoading, setIsInitialSyncLoading] = useState(false);
   const [isOnline, setIsOnline] = useState(navigator.onLine);
   const [activeListFilter, setActiveListFilter] = useState<string | null>(null);
   const appSettings = useAppSettings();
@@ -71,10 +72,11 @@ const Index = () => {
     if (user && !authLoading && !syncedRef.current && appSettings.syncEnabled) {
       syncedRef.current = true;
       setIsSyncing(true);
+      setIsInitialSyncLoading(true);
       syncLibraryFromBackend()
         .then(novels => setLibrary(novels))
         .catch(() => setLibrary(getLibrary()))
-        .finally(() => { setIsSyncing(false); hideSplash(); });
+        .finally(() => { setIsSyncing(false); setIsInitialSyncLoading(false); hideSplash(); });
     } else {
       hideSplash();
     }
@@ -290,7 +292,19 @@ const Index = () => {
           </div>
         )}
 
-        {filteredLibrary.length === 0 ? (
+        {isInitialSyncLoading ? (
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
+            {Array.from({ length: 6 }).map((_, i) => (
+              <div key={i} className="animate-pulse">
+                <div className="aspect-[3/4] bg-muted rounded-t-xl" />
+                <div className="p-3 bg-card border border-border rounded-b-xl space-y-2">
+                  <div className="h-3 bg-muted rounded w-4/5" />
+                  <div className="h-2.5 bg-muted rounded w-3/5" />
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : filteredLibrary.length === 0 ? (
           <div className="text-center py-16 border border-dashed border-border rounded-xl">
             <BookOpen className="w-10 h-10 text-muted-foreground/30 mx-auto mb-3" />
             <p className="text-muted-foreground font-sans-ui text-sm">
