@@ -1,4 +1,4 @@
-import { useRef, useEffect, useCallback } from 'react';
+import { useRef, useCallback } from 'react';
 
 interface UseSwipeNavigationOptions {
   onSwipeLeft?: () => void;
@@ -13,8 +13,12 @@ export function useSwipeNavigation({
   threshold = 80,
   enabled = true,
 }: UseSwipeNavigationOptions) {
+  // Touch tracking (mobile / tablet)
   const touchStart = useRef<{ x: number; y: number } | null>(null);
   const touchEnd = useRef<{ x: number; y: number } | null>(null);
+
+  // Pointer tracking (mouse drag on desktop)
+  const pointerStart = useRef<{ x: number; y: number } | null>(null);
 
   const onTouchStart = useCallback((e: TouchEvent) => {
     if (!enabled) return;
@@ -39,17 +43,30 @@ export function useSwipeNavigation({
     const deltaX = touchStart.current.x - touchEnd.current.x;
     const deltaY = touchStart.current.y - touchEnd.current.y;
 
-    // Only trigger if horizontal swipe is dominant (not vertical scrolling)
     if (Math.abs(deltaX) > Math.abs(deltaY) && Math.abs(deltaX) > threshold) {
-      if (deltaX > 0) {
-        onSwipeLeft?.(); // Swipe left → next chapter
-      } else {
-        onSwipeRight?.(); // Swipe right → prev chapter
-      }
+      if (deltaX > 0) onSwipeLeft?.();
+      else onSwipeRight?.();
     }
 
     touchStart.current = null;
     touchEnd.current = null;
+  }, [enabled, threshold, onSwipeLeft, onSwipeRight]);
+
+  // Mouse drag support for desktop
+  const onPointerDown = useCallback((e: PointerEvent) => {
+    if (!enabled || e.pointerType !== 'mouse') return;
+    pointerStart.current = { x: e.clientX, y: e.clientY };
+  }, [enabled]);
+
+  const onPointerUp = useCallback((e: PointerEvent) => {
+    if (!enabled || e.pointerType !== 'mouse' || !pointerStart.current) return;
+    const deltaX = pointerStart.current.x - e.clientX;
+    const deltaY = pointerStart.current.y - e.clientY;
+    if (Math.abs(deltaX) > Math.abs(deltaY) && Math.abs(deltaX) > threshold) {
+      if (deltaX > 0) onSwipeLeft?.();
+      else onSwipeRight?.();
+    }
+    pointerStart.current = null;
   }, [enabled, threshold, onSwipeLeft, onSwipeRight]);
 
   const bindSwipe = useCallback((el: HTMLElement | null) => {
@@ -58,13 +75,17 @@ export function useSwipeNavigation({
     el.addEventListener('touchstart', onTouchStart, { passive: true });
     el.addEventListener('touchmove', onTouchMove, { passive: true });
     el.addEventListener('touchend', onTouchEnd);
+    el.addEventListener('pointerdown', onPointerDown);
+    el.addEventListener('pointerup', onPointerUp);
 
     return () => {
       el.removeEventListener('touchstart', onTouchStart);
       el.removeEventListener('touchmove', onTouchMove);
       el.removeEventListener('touchend', onTouchEnd);
+      el.removeEventListener('pointerdown', onPointerDown);
+      el.removeEventListener('pointerup', onPointerUp);
     };
-  }, [onTouchStart, onTouchMove, onTouchEnd]);
+  }, [onTouchStart, onTouchMove, onTouchEnd, onPointerDown, onPointerUp]);
 
   return { bindSwipe };
 }

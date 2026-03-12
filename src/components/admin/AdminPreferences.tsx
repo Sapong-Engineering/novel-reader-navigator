@@ -137,11 +137,19 @@ const AdminPreferences = () => {
         <CardContent className="space-y-5">
           <div className="space-y-3">
             <Label className="text-xs text-muted-foreground uppercase tracking-wide">Enabled Adapters</Label>
-            {['WuxiaClick', 'NovelBin', 'EmpireNovel'].map(adapter => {
-              const key = `adapter_${adapter.toLowerCase()}`;
+            {([
+              { name: 'WuxiaClick', note: '' },
+              { name: 'NovelBin', note: '' },
+              { name: 'EmpireNovel', note: '' },
+              { name: 'Gutenberg', note: 'Public domain books — full text parse, slower initial load' },
+            ] as { name: string; note: string }[]).map(({ name, note }) => {
+              const key = `adapter_${name.toLowerCase()}`;
               return (
-                <div key={adapter} className="flex items-center justify-between">
-                  <Label>{adapter}</Label>
+                <div key={name} className="flex items-center justify-between gap-4">
+                  <div>
+                    <Label>{name}</Label>
+                    {note && <p className="text-xs text-muted-foreground mt-0.5">{note}</p>}
+                  </div>
                   <Switch
                     checked={settings[key] ?? true}
                     onCheckedChange={v => updateSetting(key, v)}

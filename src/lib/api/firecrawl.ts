@@ -12,6 +12,7 @@ export interface SearchResult {
   url: string;
   description: string;
   source: string;
+  author?: string;
 }
 
 export async function scrapeNovelInfo(url: string): Promise<NovelInfo> {

@@ -1,4 +1,4 @@
-import { Play, Pause, Square, SkipForward, Volume2, Mic2, Sparkles, Loader2 } from 'lucide-react';
+import { Play, Pause, Square, SkipForward, SkipBack, ChevronFirst, Volume2, Mic2, Sparkles, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
@@ -21,6 +21,7 @@ interface TTSControlsProps {
   onPlay: () => void;
   onPause: () => void;
   onStop: () => void;
+  onJumpTo: (index: number) => void;
   // AI engine props
   ttsEngine: TTSEngine;
   onEngineChange: (e: TTSEngine) => void;
@@ -47,6 +48,7 @@ const TTSControls = ({
   onPlay,
   onPause,
   onStop,
+  onJumpTo,
   ttsEngine,
   onEngineChange,
   aiVoices,
@@ -105,6 +107,34 @@ const TTSControls = ({
           )}
           <Button variant="ghost" size="icon" className="h-8 w-8" onClick={onStop} title="Stop" disabled={!isPlaying && !isPaused}>
             <Square className="w-3.5 h-3.5" />
+          </Button>
+        </div>
+
+        {/* In-chapter skip controls */}
+        <div className="flex items-center gap-0.5">
+          <Button
+            variant="ghost" size="icon" className="h-7 w-7"
+            onClick={() => onJumpTo(0)}
+            disabled={currentIndex === 0}
+            title="Restart from beginning"
+          >
+            <ChevronFirst className="w-3.5 h-3.5" />
+          </Button>
+          <Button
+            variant="ghost" size="icon" className="h-7 w-7"
+            onClick={() => onJumpTo(Math.max(0, currentIndex - 1))}
+            disabled={currentIndex === 0}
+            title="Back 1 paragraph"
+          >
+            <SkipBack className="w-3.5 h-3.5" />
+          </Button>
+          <Button
+            variant="ghost" size="icon" className="h-7 w-7"
+            onClick={() => onJumpTo(Math.min(totalParagraphs - 1, currentIndex + 1))}
+            disabled={currentIndex >= totalParagraphs - 1}
+            title="Forward 1 paragraph"
+          >
+            <SkipForward className="w-3.5 h-3.5" />
           </Button>
         </div>
 

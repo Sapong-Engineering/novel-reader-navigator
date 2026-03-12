@@ -21,13 +21,23 @@ export interface Novel {
 
 const STORAGE_KEY = 'novel-reader-library';
 
+// Prevent repeated quota toast — show at most once per 30 seconds
+let lastQuotaToastAt = 0;
+
 function safePersist(key: string, data: string): boolean {
   try {
     localStorage.setItem(key, data);
     return true;
   } catch (e) {
     if (e instanceof DOMException && e.name === 'QuotaExceededError') {
-      toast.error('Storage is full. Consider removing some novels to free up space.');
+      const now = Date.now();
+      if (now - lastQuotaToastAt > 30_000) {
+        lastQuotaToastAt = now;
+        toast.error('Storage is full. Remove some novels to free up space.', {
+          action: { label: 'OK', onClick: () => {} },
+          duration: 8000,
+        });
+      }
     } else {
       console.error('Failed to save to localStorage:', e);
     }

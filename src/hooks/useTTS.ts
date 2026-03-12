@@ -54,6 +54,10 @@ export function useTTS(onChapterEnd?: () => void) {
   const prefetchRef = useRef<{ index: number; blob: Blob } | null>(null);
   const engineRef = useRef(ttsEngine);
   const aiVoiceRef = useRef(selectedAiVoice);
+  // Tracks current index for visibility-based resume
+  const currentIndexRef = useRef(0);
+  // Incremented on every new playAiParagraph call; stale async fetches abort when mismatched
+  const playGenerationRef = useRef(0);
 
   speedRef.current = speed;
   voiceRef.current = selectedVoice;
@@ -117,6 +121,19 @@ export function useTTS(onChapterEnd?: () => void) {
     return resp.blob();
   }, []);
 
+  // Retry wrapper — 2 retries with 500ms delay for network glitches on mobile
+  const fetchAiAudioWithRetry = useCallback(async (text: string, retries = 2): Promise<Blob> => {
+    for (let attempt = 0; attempt <= retries; attempt++) {
+      try {
+        return await fetchAiAudio(text);
+      } catch (err) {
+        if (attempt === retries) throw err;
+        await new Promise(r => setTimeout(r, 500));
+      }
+    }
+    throw new Error('Unreachable');
+  }, [fetchAiAudio]);
+
   const prefetchNext = useCallback((nextIndex: number) => {
     if (nextIndex >= paragraphsRef.current.length) return;
     const text = paragraphsRef.current[nextIndex];
@@ -126,6 +143,9 @@ export function useTTS(onChapterEnd?: () => void) {
   }, [fetchAiAudio]);
 
   const playAiParagraph = useCallback(async (index: number) => {
+    // Claim this generation — any older in-flight call will see a mismatch and abort
+    const myGeneration = ++playGenerationRef.current;
+
     if (index >= paragraphsRef.current.length) {
       setIsPlaying(false);
       setIsPaused(false);
@@ -137,6 +157,7 @@ export function useTTS(onChapterEnd?: () => void) {
 
     setIsAiLoading(true);
     setCurrentIndex(index);
+    currentIndexRef.current = index;
 
     try {
       let blob: Blob;
@@ -144,10 +165,11 @@ export function useTTS(onChapterEnd?: () => void) {
         blob = prefetchRef.current.blob;
         prefetchRef.current = null;
       } else {
-        blob = await fetchAiAudio(paragraphsRef.current[index]);
+        blob = await fetchAiAudioWithRetry(paragraphsRef.current[index]);
       }
 
-      if (!isPlayingRef.current) return;
+      // Abort if a newer call superseded us or playback was stopped
+      if (myGeneration !== playGenerationRef.current || !isPlayingRef.current) return;
 
       const objectUrl = URL.createObjectURL(blob);
       const audio = new Audio(objectUrl);
@@ -156,9 +178,10 @@ export function useTTS(onChapterEnd?: () => void) {
 
       audio.onended = () => {
         URL.revokeObjectURL(objectUrl);
-        if (!isPlayingRef.current) return;
+        if (!isPlayingRef.current || myGeneration !== playGenerationRef.current) return;
         const next = index + 1;
         setCurrentIndex(next);
+        currentIndexRef.current = next;
         playAiParagraph(next);
       };
 
@@ -167,6 +190,17 @@ export function useTTS(onChapterEnd?: () => void) {
         setIsPlaying(false);
         setIsAiLoading(false);
         isPlayingRef.current = false;
+      };
+
+      // Detect unexpected pauses (e.g. iOS backgrounding) and resume
+      audio.onpause = () => {
+        if (isPlayingRef.current && myGeneration === playGenerationRef.current && !audio.ended) {
+          setTimeout(() => {
+            if (isPlayingRef.current && myGeneration === playGenerationRef.current && audio.paused && !audio.ended) {
+              audio.play().catch(() => {});
+            }
+          }, 300);
+        }
       };
 
       await audio.play();
@@ -178,7 +212,7 @@ export function useTTS(onChapterEnd?: () => void) {
       setIsAiLoading(false);
       isPlayingRef.current = false;
     }
-  }, [autoAdvance, onChapterEnd, fetchAiAudio, prefetchNext]);
+  }, [autoAdvance, onChapterEnd, fetchAiAudioWithRetry, prefetchNext]);
 
   // --- Browser TTS ---
   const speakParagraph = useCallback((index: number) => {
@@ -261,6 +295,7 @@ export function useTTS(onChapterEnd?: () => void) {
   }, []);
 
   const stop = useCallback(() => {
+    playGenerationRef.current++;   // cancel any in-flight AI fetch
     speechSynthesis.cancel();
     if (audioRef.current) {
       audioRef.current.pause();
@@ -275,6 +310,10 @@ export function useTTS(onChapterEnd?: () => void) {
   }, []);
 
   const jumpTo = useCallback((index: number) => {
+    const wasPlaying = isPlayingRef.current || isPlaying;
+    // Invalidate any in-flight AI fetch and set false BEFORE pause so the onpause handler doesn't fire
+    playGenerationRef.current++;
+    isPlayingRef.current = false;
     speechSynthesis.cancel();
     if (audioRef.current) {
       audioRef.current.pause();
@@ -282,7 +321,8 @@ export function useTTS(onChapterEnd?: () => void) {
     }
     prefetchRef.current = null;
     setCurrentIndex(index);
-    if (isPlayingRef.current || isPlaying) {
+    currentIndexRef.current = index;
+    if (wasPlaying) {
       isPlayingRef.current = true;
       setIsPlaying(true);
       setIsPaused(false);
@@ -293,6 +333,26 @@ export function useTTS(onChapterEnd?: () => void) {
       }
     }
   }, [isPlaying, speakParagraph, playAiParagraph]);
+
+  // Resume AI audio when tab/screen becomes visible again (mobile backgrounding)
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible' && isPlayingRef.current && engineRef.current === 'ai') {
+        const audio = audioRef.current;
+        if (audio && audio.paused && !audio.ended) {
+          audio.play().catch(() => {
+            // Audio context was killed — restart from current paragraph
+            playAiParagraph(currentIndexRef.current);
+          });
+        } else if (!audio) {
+          // No audio element — restart playback from where we left off
+          playAiParagraph(currentIndexRef.current);
+        }
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
+  }, [playAiParagraph]);
 
   // Cleanup
   useEffect(() => {

@@ -133,13 +133,23 @@ Deno.serve(async (req) => {
 
         const cleanUrl = url.replace(/\?page=\d+/, '');
 
+        const rawTitle: string = item.title || '';
+
+        // Extract author for Gutenberg before stripping it from the title
+        let author: string | undefined;
+        if (source === 'Gutenberg') {
+          const authorMatch = rawTitle.match(/ by ([^-]+?)(?:\s*-\s*Project Gutenberg)/i);
+          if (authorMatch) author = authorMatch[1].trim();
+        }
+
         return {
-          title: (item.title || '')
+          title: rawTitle
             .replace(/ - NovelBin| - WuxiaClick| - EmpireNovel| - Read| Online Free| Novel Full| read online \| Empire Novel| Light Novels| - Free eBook \| Project Gutenberg| by .* - Project Gutenberg/gi, '')
             .trim(),
           url: cleanUrl,
           description: item.description || '',
           source,
+          ...(author ? { author } : {}),
         };
       })
       .filter(Boolean);

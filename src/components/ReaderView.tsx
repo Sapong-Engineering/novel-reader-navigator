@@ -1,6 +1,5 @@
 import { useRef, useEffect, useState, useCallback } from 'react';
 import { useSwipeNavigation } from '@/hooks/useSwipeNavigation';
-import { useIsMobile } from '@/hooks/use-mobile';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { ChevronLeft, ChevronRight, Bookmark, BookmarkCheck, ArrowUp, ArrowDown, BookOpen } from 'lucide-react';
@@ -38,6 +37,7 @@ interface ReaderViewProps {
     play: () => void;
     pause: () => void;
     stop: () => void;
+    jumpTo: (index: number) => void;
     ttsEngine: 'browser' | 'ai';
     setTtsEngine: (e: 'browser' | 'ai') => void;
     aiVoices: { id: string; name: string }[];
@@ -69,12 +69,11 @@ const ReaderView = ({
   const [scrollProgress, setScrollProgress] = useState(0);
   const [showLabelInput, setShowLabelInput] = useState(false);
   const [labelDraft, setLabelDraft] = useState('');
-  const isMobile = useIsMobile();
 
   const { bindSwipe } = useSwipeNavigation({
     onSwipeLeft: useCallback(() => { if (hasNext) onNextChapter?.(); }, [hasNext, onNextChapter]),
     onSwipeRight: useCallback(() => { if (hasPrev) onPrevChapter?.(); }, [hasPrev, onPrevChapter]),
-    enabled: isMobile,
+    enabled: true,
   });
 
   useEffect(() => {
@@ -322,6 +321,7 @@ const ReaderView = ({
           onPlay={tts.play}
           onPause={tts.pause}
           onStop={tts.stop}
+          onJumpTo={tts.jumpTo}
           ttsEngine={tts.ttsEngine}
           onEngineChange={tts.setTtsEngine}
           aiVoices={tts.aiVoices}
