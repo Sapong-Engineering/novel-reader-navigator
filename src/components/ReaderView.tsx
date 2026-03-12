@@ -223,9 +223,14 @@ const ReaderView = ({
             >
               {(() => {
                 let foundFirst = false;
+                const isAdParagraph = (text: string): boolean => {
+                  if (/!\[/.test(text)) return true;
+                  const promoKeywords = ['Free To Try', 'No Sign Up', 'Instant Results', 'Toy-ify', 'EasyPhoto'];
+                  return promoKeywords.filter(kw => text.includes(kw)).length >= 2;
+                };
                 return chapter.content!.split('\n\n').map((para, i) => {
                   const trimmed = para.trim();
-                  if (!trimmed) return null;
+                  if (!trimmed || isAdParagraph(trimmed)) return null;
                   const isFirst = !foundFirst && !isChapterTitle(trimmed) && trimmed.length > 30;
                   if (isFirst) foundFirst = true;
                   const idx = paraIndex++;

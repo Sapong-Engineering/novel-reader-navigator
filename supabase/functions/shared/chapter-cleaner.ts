@@ -16,6 +16,9 @@ export function cleanChapterContent(markdown: string, url: string): string {
 
   // ── Generic cleaning (all sites) ───────────────────────────
 
+  // Remove ad widgets and inline media — chapter prose never contains images or external links
+  content = removeInlineMedia(content);
+
   // Remove markdown links to Previous/Next Chapter navigation
   content = content.replace(/\[.*?(?:Previous|Next)\s*(?:Chapter)?\s*\]\(.*?\)/gi, '');
 
@@ -217,6 +220,29 @@ function cleanEmpireNovel(content: string): string {
 
   // Remove ad placeholders
   content = content.replace(/^.*(?:Advertisement|Sponsored|Ad\s*Block).*$/gim, '');
+
+  return content;
+}
+
+/**
+ * Removes inline media and ad widgets from scraped Markdown.
+ * Novel chapter prose never legitimately contains images or external links —
+ * any such Markdown is noise from ads, banners, or promotional widgets.
+ */
+function removeInlineMedia(content: string): string {
+  // Step A: Strip compound image-links [![img](imgUrl) text](linkUrl)
+  // The `s` flag (dotAll) lets . match \n so multi-line widgets are caught.
+  // [^\]]*? is non-greedy and stops at the first ], preventing runaway matches.
+  content = content.replace(/\[!\[[^\]]*?\]\([^)]+?\)[^\]]*?\]\(https?:\/\/[^)]+?\)/gs, '');
+
+  // Step B: Strip remaining standalone markdown images ![alt](url)
+  content = content.replace(/!\[[^\]]*?\]\([^)]+?\)/g, '');
+
+  // Step C: Strip orphaned link wrappers left after image removal [  \ ](url)
+  content = content.replace(/\[[\s\\]*\]\(https?:\/\/[^)]+?\)/g, '');
+
+  // Step D: Remove lines that are only backslash characters (Firecrawl <br> artifacts)
+  content = content.replace(/^\\{1,2}\s*$/gm, '');
 
   return content;
 }
