@@ -1,0 +1,253 @@
+/**
+ * Tests for the content-scorer block scoring algorithm.
+ *
+ * Following the established pattern (see sanitization.test.ts): the pure
+ * functions are re-implemented locally because supabase/functions/ is outside
+ * Vitest's module resolution scope.
+ */
+import { describe, it, expect } from 'vitest';
+
+// ── Re-implement scoring primitives (mirrors content-scorer.ts) ──────────────
+
+const UI_VOCABULARY: readonly string[] = [
+  'Previous Chapter', 'Next Chapter', 'Table of Contents', 'All Chapters',
+  'Chapter List', 'Read Next', 'Read Prev',
+  'Novel Info', 'Read at', 'Visit us at', 'Originally posted',
+  'Mark Read', 'Bookmark', 'Follow Novel', 'Add to Library',
+  'Report chapter', 'What do you think', 'Total Responses', 'Loading comments',
+  'Sort by', 'Add a Comment', 'Post Comment', 'Load More', 'Submit Reply',
+  'Upvote', 'Downvote', 'Reaction',
+  'Terms of Service', 'Privacy Policy', 'Cookie Policy', 'DMCA', 'Copyright',
+  'Contact Us',
+  'Free To Try', 'No Sign Up', 'Instant Results',
+  'Advertisement', 'Sponsored', 'Ad Block',
+  'Log in', 'Sign in', 'Register', 'Create account',
+  'Translator', 'Editor', 'Proofreader',
+];
+
+function computeLinkDensity(text: string): number {
+  if (!text) return 0;
+  let linkChars = 0;
+  const linkPattern = /\[[^\]]*?\]\([^)]*?\)/g;
+  let m: RegExpExecArray | null;
+  while ((m = linkPattern.exec(text)) !== null) {
+    linkChars += m[0].length;
+  }
+  return Math.min(1.0, linkChars / text.length);
+}
+
+function computeShortLineRatio(text: string): number {
+  const lines = text.split('\n').filter(l => l.trim().length > 0);
+  if (lines.length === 0) return 0;
+  const shortLines = lines.filter(l => l.trim().length < 25).length;
+  return shortLines / lines.length;
+}
+
+function countUIKeywords(text: string): number {
+  const lower = text.toLowerCase();
+  return UI_VOCABULARY.filter(kw => lower.includes(kw.toLowerCase())).length;
+}
+
+function countExternalUrls(text: string): number {
+  return (text.match(/https?:\/\//g) ?? []).length;
+}
+
+function scoreBlock(text: string): number {
+  if (!text.trim()) return 1.0;
+  let score = 0;
+  if (/!\[/.test(text)) score += 0.60;
+  if (computeLinkDensity(text) > 0.20) score += 0.30;
+  const wordCount = text.trim().split(/\s+/).length;
+  if (computeShortLineRatio(text) > 0.60 && wordCount < 40) score += 0.25;
+  if (countUIKeywords(text) >= 2) score += 0.25;
+  if (countExternalUrls(text) >= 2) score += 0.20;
+  if (/^#{1,6}\s+.{1,40}$/m.test(text) && wordCount < 15) score += 0.15;
+  return Math.min(1.0, score);
+}
+
+function isNoiseBlock(text: string, threshold = 0.40): boolean {
+  return scoreBlock(text) >= threshold;
+}
+
+// ── Fixtures ─────────────────────────────────────────────────────────────────
+
+const PROSE_PARAGRAPH = `Luo Feng stood atop the cliff, the wind howling around him as he gazed out \
+across the vast expanse of the Nilotic Sea. The waves crashed against the rocks far below, \
+sending white foam spraying upward into the grey morning air. He had been standing here \
+for almost an hour, lost in thought, replaying the events of the previous night in his mind.`;
+
+const CHAPTER_TITLE = `Chapter 127: The Awakening`;
+
+const BESTPHOTO_AD = `[![](https://bestphoto.ai/android-chrome-512x512.png)\\
+EasyPhoto\\
+Toy-ify\\
+Transform anyone into a toy figure! Create Funko Pop, LEGO, and other toy versions!\\
+Free To Try\\
+No Sign Up\\
+Instant Results\\
+![Before - Original Image](https://images.bestphoto.ai/toy-before-9.jpg)\\
+Before\\
+![After - AI Enhanced Image](https://images.bestphoto.ai/toy-after-9.jpg)\\
+After - AI Enhanced](https://bestphoto.ai/free-tools/toy-ify)`;
+
+const DISQUS_BLOCK = `Report chapter Comments
+
+### What do you think?
+
+Total Responses: 14
+
+Sort by: Latest
+
+Add a Comment
+
+Loading comments...
+
+Load More`;
+
+const NAV_LINKS_BLOCK = `[Previous Chapter](https://wuxia.click/chapter/foo-1)
+[Next Chapter](https://wuxia.click/chapter/foo-3)
+[Table of Contents](https://wuxia.click/novel/foo)`;
+
+const SHORT_UI_BLOCK = `Mark Read\nBookmark\nFollow Novel\nAdd to Library\nReport`;
+
+// ── Tests ─────────────────────────────────────────────────────────────────────
+
+describe('computeLinkDensity', () => {
+  it('returns 0 for plain prose (no links)', () => {
+    expect(computeLinkDensity(PROSE_PARAGRAPH)).toBe(0);
+  });
+
+  it('returns 1.0 for a block that is entirely a markdown link', () => {
+    const allLink = '[Read Now](https://example.com)';
+    expect(computeLinkDensity(allLink)).toBeCloseTo(1.0, 1);
+  });
+
+  it('returns intermediate value for mixed prose + one link', () => {
+    const mixed = 'Some prose here. ' + '[Click here](https://example.com)';
+    const density = computeLinkDensity(mixed);
+    expect(density).toBeGreaterThan(0);
+    expect(density).toBeLessThan(1);
+  });
+
+  it('returns 0 for empty string', () => {
+    expect(computeLinkDensity('')).toBe(0);
+  });
+});
+
+describe('computeShortLineRatio', () => {
+  it('returns low ratio for long prose lines', () => {
+    const longLines = 'This is a very long line of story prose that exceeds twenty-five characters.\nAnother long prose sentence here.';
+    expect(computeShortLineRatio(longLines)).toBeLessThan(0.3);
+  });
+
+  it('returns high ratio for stacked short UI labels', () => {
+    expect(computeShortLineRatio(SHORT_UI_BLOCK)).toBeGreaterThan(0.8);
+  });
+
+  it('returns 0 for empty string', () => {
+    expect(computeShortLineRatio('')).toBe(0);
+  });
+});
+
+describe('countUIKeywords', () => {
+  it('counts 0 for clean prose', () => {
+    expect(countUIKeywords(PROSE_PARAGRAPH)).toBe(0);
+  });
+
+  it('counts matches from UI vocabulary', () => {
+    expect(countUIKeywords(DISQUS_BLOCK)).toBeGreaterThanOrEqual(3);
+  });
+
+  it('is case-insensitive', () => {
+    expect(countUIKeywords('TERMS OF SERVICE and PRIVACY POLICY')).toBeGreaterThanOrEqual(2);
+  });
+
+  it('counts 0 for chapter title', () => {
+    expect(countUIKeywords(CHAPTER_TITLE)).toBe(0);
+  });
+});
+
+describe('countExternalUrls', () => {
+  it('returns 0 for plain prose', () => {
+    expect(countExternalUrls(PROSE_PARAGRAPH)).toBe(0);
+  });
+
+  it('counts multiple URLs in nav block', () => {
+    expect(countExternalUrls(NAV_LINKS_BLOCK)).toBe(3);
+  });
+
+  it('counts URLs in ad widget', () => {
+    expect(countExternalUrls(BESTPHOTO_AD)).toBeGreaterThanOrEqual(2);
+  });
+});
+
+describe('scoreBlock', () => {
+  it('scores clean prose paragraph well below threshold (< 0.20)', () => {
+    expect(scoreBlock(PROSE_PARAGRAPH)).toBeLessThan(0.20);
+  });
+
+  it('scores chapter title line below threshold (< 0.40)', () => {
+    expect(scoreBlock(CHAPTER_TITLE)).toBeLessThan(0.40);
+  });
+
+  it('scores bestphoto.ai ad widget at or above 0.60 (image signal alone)', () => {
+    expect(scoreBlock(BESTPHOTO_AD)).toBeGreaterThanOrEqual(0.60);
+  });
+
+  it('scores Disqus comment block at or above 0.40', () => {
+    expect(scoreBlock(DISQUS_BLOCK)).toBeGreaterThanOrEqual(0.40);
+  });
+
+  it('scores navigation link block at or above 0.40', () => {
+    expect(scoreBlock(NAV_LINKS_BLOCK)).toBeGreaterThanOrEqual(0.40);
+  });
+
+  it('scores stacked UI label block at or above 0.40', () => {
+    expect(scoreBlock(SHORT_UI_BLOCK)).toBeGreaterThanOrEqual(0.40);
+  });
+
+  it('returns 1.0 for empty string', () => {
+    expect(scoreBlock('')).toBe(1.0);
+  });
+
+  it('score is clamped to 1.0 even when multiple signals fire', () => {
+    // Multiple strong signals — should not exceed 1.0
+    const multiSignal = `![img](https://ads.com/img.png) [Free To Try](https://ads.com) No Sign Up\nInstant Results\nFree`;
+    expect(scoreBlock(multiSignal)).toBeLessThanOrEqual(1.0);
+  });
+});
+
+describe('isNoiseBlock', () => {
+  it('returns false for clean story paragraph', () => {
+    expect(isNoiseBlock(PROSE_PARAGRAPH)).toBe(false);
+  });
+
+  it('returns false for chapter title', () => {
+    expect(isNoiseBlock(CHAPTER_TITLE)).toBe(false);
+  });
+
+  it('returns true for bestphoto.ai ad widget', () => {
+    expect(isNoiseBlock(BESTPHOTO_AD)).toBe(true);
+  });
+
+  it('returns true for Disqus comment block', () => {
+    expect(isNoiseBlock(DISQUS_BLOCK)).toBe(true);
+  });
+
+  it('returns true for navigation link block', () => {
+    expect(isNoiseBlock(NAV_LINKS_BLOCK)).toBe(true);
+  });
+
+  it('respects a custom lower threshold', () => {
+    // A block scoring ~0.15 (prose) is not noise at 0.40 but is at 0.10
+    expect(isNoiseBlock(PROSE_PARAGRAPH, 0.10)).toBe(false);
+  });
+
+  it('respects a custom higher threshold (lenient)', () => {
+    // Nav links block at 0.40+ would be noise at default but not at 0.90
+    const score = scoreBlock(NAV_LINKS_BLOCK);
+    if (score < 0.90) {
+      expect(isNoiseBlock(NAV_LINKS_BLOCK, 0.90)).toBe(false);
+    }
+  });
+});

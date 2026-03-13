@@ -1,3 +1,5 @@
+import { scoreBlock, isNoiseBlock } from './content-scorer.ts';
+
 /**
  * Cleans scraped chapter markdown by stripping navigation, branding,
  * breadcrumbs, ads, and site chrome so only novel text remains.
@@ -16,8 +18,14 @@ export function cleanChapterContent(markdown: string, url: string): string {
 
   // ── Generic cleaning (all sites) ───────────────────────────
 
-  // Remove ad widgets and inline media — chapter prose never contains images or external links
-  content = removeInlineMedia(content);
+  // Structural cleaning: strip inline media, score each block, discard noise
+  // blocks, and truncate the tail zone (comment widgets, footers, ad sections).
+  // Handles any ad network or comment system generically — no hardcoded URLs.
+  content = applyStructuralCleaning(content);
+
+  // Final-pass targeted regex for navigation patterns that survive scoring
+  // (single short link lines with "Previous"/"Next" don't always trigger the
+  // multi-signal threshold but are unambiguously non-prose).
 
   // Remove markdown links to Previous/Next Chapter navigation
   content = content.replace(/\[.*?(?:Previous|Next)\s*(?:Chapter)?\s*\]\(.*?\)/gi, '');
@@ -222,6 +230,43 @@ function cleanEmpireNovel(content: string): string {
   content = content.replace(/^.*(?:Advertisement|Sponsored|Ad\s*Block).*$/gim, '');
 
   return content;
+}
+
+/**
+ * Applies the structural cleaning algorithm to post-header-strip content.
+ *
+ * Three steps:
+ *  1. Pre-process: strip inline media (images, compound image-links)
+ *  2. Score each \n\n-delimited block — discard blocks scoring ≥ 0.40
+ *  3. Detect story endpoint (last block with score < 0.40 AND ≥ 20 words)
+ *     and truncate everything after it (the "tail zone")
+ */
+function applyStructuralCleaning(content: string): string {
+  // Pre-process: remove markdown images and compound image-links first.
+  // This improves scoring accuracy (image presence is the strongest signal)
+  // and removes multi-line ad widgets before block splitting.
+  content = removeInlineMedia(content);
+
+  const blocks = content.split('\n\n');
+  const scores = blocks.map(b => scoreBlock(b));
+
+  // Find story endpoint: last block that is clearly prose (score < 0.40, ≥ 20 words).
+  // Everything after this is the tail zone (comment sections, footers, rating widgets).
+  let storyEndIdx = blocks.length - 1;
+  for (let i = blocks.length - 1; i >= 0; i--) {
+    const wordCount = blocks[i].trim().split(/\s+/).length;
+    if (scores[i] < 0.40 && wordCount >= 20) {
+      storyEndIdx = i;
+      break;
+    }
+  }
+
+  // Keep only non-noise blocks up to and including the story endpoint.
+  const kept = blocks
+    .slice(0, storyEndIdx + 1)
+    .filter((_b, i) => !isNoiseBlock(blocks[i]));
+
+  return kept.join('\n\n');
 }
 
 /**
