@@ -71,3 +71,7 @@ Yes, you can!
 To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
 
 Read more here: [Setting up a custom domain](https://docs.lovable.dev/features/custom-domain#custom-domain)
+
+## Deployment Strategy
+main-netlifly deployed on netifly (feature-cleanup-upg branch and main-netlifly using an external Supabase config - zbhbghpxgswsvkefhufl)
+main deployed lovable
