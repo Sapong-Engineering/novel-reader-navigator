@@ -1,11 +1,11 @@
 import type { CapacitorConfig } from '@capacitor/cli';
 
 const config: CapacitorConfig = {
-  appId: 'app.lovable.85eb9eef4af846689a48faf34d9b198f',
+  appId: 'com.novelnav.app',
   appName: 'novelnav',
   webDir: 'dist',
   server: {
-    url: 'https://85eb9eef-4af8-4668-9a48-faf34d9b198f.lovableproject.com?forceHideBadge=true',
+    url: 'https://novelnav.netlify.app',
     cleartext: true,
   },
   plugins: {
