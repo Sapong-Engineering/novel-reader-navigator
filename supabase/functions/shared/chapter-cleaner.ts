@@ -277,8 +277,12 @@ function applyStructuralCleaning(content: string): string {
 function removeInlineMedia(content: string): string {
   // Step A: Strip compound image-links [![img](imgUrl) text](linkUrl)
   // The `s` flag (dotAll) lets . match \n so multi-line widgets are caught.
-  // [^\]]*? is non-greedy and stops at the first ], preventing runaway matches.
-  content = content.replace(/\[!\[[^\]]*?\]\([^)]+?\)[^\]]*?\]\(https?:\/\/[^)]+?\)/gs, '');
+  //
+  // Middle section uses (?:[^\]]|\](?!\(https?:\/\/))*? instead of [^\]]*?
+  // so it can consume ] characters from nested inner images (e.g. ![alt](url)
+  // inside the outer [...]). It only stops at ] when immediately followed by
+  // https?://, which is the outer link URL — not an inner image URL.
+  content = content.replace(/\[!\[[^\]]*?\]\([^)]+?\)(?:[^\]]|\](?!\(https?:\/\/))*?\]\(https?:\/\/[^)]+?\)/gs, '');
 
   // Step B: Strip remaining standalone markdown images ![alt](url)
   content = content.replace(/!\[[^\]]*?\]\([^)]+?\)/g, '');
@@ -286,8 +290,17 @@ function removeInlineMedia(content: string): string {
   // Step C: Strip orphaned link wrappers left after image removal [  \ ](url)
   content = content.replace(/\[[\s\\]*\]\(https?:\/\/[^)]+?\)/g, '');
 
-  // Step D: Remove lines that are only backslash characters (Firecrawl <br> artifacts)
+  // Step D: Remove lines that are only backslash characters (Firecrawl <br> artifacts).
+  // Also removes short label+backslash lines like "Before\\" or "After\\" that
+  // are orphaned ad image captions left when Steps A/B strip the surrounding widget.
+  content = content.replace(/^\w[\w\s\-]{0,20}\\{1,2}\s*$/gm, '');
   content = content.replace(/^\\{1,2}\s*$/gm, '');
+
+  // Step E: Remove orphaned ad closing brackets — lines ending with ](url) that
+  // have no [ opener on the same line. These are tails of compound ad widgets
+  // that survived Steps A–D (e.g. "After - AI Enhanced](https://bestphoto.ai/…)").
+  // [^\[\n]* excludes \n so the match is confined to a single line.
+  content = content.replace(/^[^\[\n]*\]\(https?:\/\/[^)]+\)\s*$/gm, '');
 
   return content;
 }
