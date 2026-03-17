@@ -8,7 +8,10 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Slider } from '@/components/ui/slider';
-import { Loader2, Palette, Bot, Wrench } from 'lucide-react';
+import { Loader2, Palette, Bot, Wrench, Sparkles, Trash2 } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { type CleaningRule } from '@/lib/api/admin';
 import AmbientSoundManager from './AmbientSoundManager';
 
 type Settings = Record<string, any>;
@@ -17,10 +20,15 @@ const AdminPreferences = () => {
   const [settings, setSettings] = useState<Settings>({});
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState<string | null>(null);
+  const [cleaningRules, setCleaningRules] = useState<CleaningRule[]>([]);
 
   useEffect(() => {
-    adminApi.getSettings().then(s => {
+    Promise.all([
+      adminApi.getSettings(),
+      adminApi.listCleaningRules(),
+    ]).then(([s, rules]) => {
       setSettings(s || {});
+      setCleaningRules(rules || []);
       setLoading(false);
     }).catch(() => {
       toast.error('Failed to load settings');
@@ -81,6 +89,7 @@ const AdminPreferences = () => {
                 min={12}
                 max={24}
                 step={1}
+                onValueChange={([v]) => setSettings(prev => ({ ...prev, default_font_size: v }))}
                 onValueCommit={([v]) => updateSetting('default_font_size', v)}
               />
             </div>
@@ -186,6 +195,127 @@ const AdminPreferences = () => {
                 }}
               />
             </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Content Cleaning */}
+      <Card className="border-border">
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <div>
+              <CardTitle className="flex items-center gap-2 text-foreground">
+                <Sparkles className="w-4 h-4 text-primary" /> Content Cleaning
+              </CardTitle>
+              <CardDescription>
+                AI-assisted noise removal. Generated rules are stored in the database and apply
+                to future chapter fetches without redeployment.
+              </CardDescription>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-5">
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div className="space-y-2">
+              <Label>Cleaning Mode</Label>
+              <Select
+                value={settings.cleaning_mode || 'rule-based'}
+                onValueChange={v => updateSetting('cleaning_mode', v)}
+              >
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="rule-based">Rule-Based (no AI cost)</SelectItem>
+                  <SelectItem value="hybrid">Hybrid (AI on suspect content)</SelectItem>
+                  <SelectItem value="ai">AI (always analyze)</SelectItem>
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">
+                Hybrid activates AI only when suspect content survives rule-based cleaning.
+              </p>
+            </div>
+            <div className="space-y-2">
+              <Label>AI Model</Label>
+              <Select
+                value={settings.cleaning_mode_ai_model || 'gpt-4o-mini'}
+                onValueChange={v => updateSetting('cleaning_mode_ai_model', v)}
+                disabled={!['hybrid', 'ai'].includes(settings.cleaning_mode)}
+              >
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="gpt-4o-mini">GPT-4o Mini (fast, low cost)</SelectItem>
+                  <SelectItem value="gpt-4o">GPT-4o (highest accuracy)</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <Label className="text-xs text-muted-foreground uppercase tracking-wide">
+                Generated Rules
+                {cleaningRules.length > 0 && (
+                  <span className="ml-2 normal-case font-normal">({cleaningRules.length})</span>
+                )}
+              </Label>
+              {cleaningRules.length > 0 && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-7 text-xs"
+                  onClick={async () => {
+                    await Promise.all(cleaningRules.map(r => adminApi.deleteCleaningRule(r.id)));
+                    setCleaningRules([]);
+                    toast.success('All cleaning rules cleared');
+                  }}
+                >
+                  Clear All
+                </Button>
+              )}
+            </div>
+            {cleaningRules.length === 0 ? (
+              <p className="text-xs text-muted-foreground">
+                No generated rules yet. Rules appear here after AI mode analyzes a chapter.
+              </p>
+            ) : (
+              <div className="space-y-2">
+                {cleaningRules.map(rule => (
+                  <div key={rule.id} className="flex items-start gap-3 rounded-md border border-border p-3">
+                    <div className="flex-1 min-w-0 space-y-1">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="text-sm font-medium truncate">{rule.description}</span>
+                        <Badge
+                          variant="outline"
+                          className={rule.created_by === null
+                            ? 'border-amber-500 text-amber-600'
+                            : 'border-blue-500 text-blue-600'}
+                        >
+                          {rule.created_by === null ? 'AI' : 'Manual'}
+                        </Badge>
+                      </div>
+                      <code
+                        className="block text-xs text-muted-foreground truncate"
+                        title={`/${rule.pattern}/${rule.flags}`}
+                      >
+                        /{rule.pattern.length > 50 ? rule.pattern.slice(0, 50) + '…' : rule.pattern}/{rule.flags}
+                      </code>
+                    </div>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-7 w-7 shrink-0 text-muted-foreground hover:text-destructive"
+                      onClick={async () => {
+                        await adminApi.deleteCleaningRule(rule.id);
+                        setCleaningRules(prev => prev.filter(r => r.id !== rule.id));
+                        toast.success('Rule deleted');
+                      }}
+                      aria-label="Delete rule"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         </CardContent>
       </Card>

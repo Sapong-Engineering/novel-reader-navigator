@@ -2,7 +2,7 @@ import { useRef, useEffect, useState, useCallback } from 'react';
 import { useSwipeNavigation } from '@/hooks/useSwipeNavigation';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { ChevronLeft, ChevronRight, Bookmark, BookmarkCheck, ArrowUp, ArrowDown, BookOpen } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Bookmark, BookmarkCheck, ArrowUp, ArrowDown, BookOpen, RefreshCw, Loader2 } from 'lucide-react';
 import TTSControls from '@/components/reader/TTSControls';
 import type { Chapter } from '@/lib/novel-store';
 import type { Bookmark as BookmarkType } from '@/lib/bookmarks';
@@ -22,6 +22,7 @@ interface ReaderViewProps {
   onRemoveBookmark?: (id: string) => void;
   ttsCurrentIndex?: number;
   isImmersive?: boolean;
+  onRefetchChapter?: () => void;
   tts?: {
     isPlaying: boolean;
     isPaused: boolean;
@@ -63,6 +64,7 @@ const ReaderView = ({
   ttsCurrentIndex = -1,
   isImmersive = false,
   tts,
+  onRefetchChapter,
 }: ReaderViewProps) => {
   const scrollRef = useRef<HTMLDivElement>(null);
   const [currentScrollTop, setCurrentScrollTop] = useState(0);
@@ -369,6 +371,21 @@ const ReaderView = ({
           <span className="text-xs text-muted-foreground font-sans-ui truncate max-w-[120px] sm:max-w-[200px] text-center">
             {chapter.title}
           </span>
+          {onRefetchChapter && (
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-7 w-7 flex-shrink-0"
+              onClick={onRefetchChapter}
+              disabled={isLoading}
+              aria-label="Re-fetch chapter"
+              title="Re-fetch chapter"
+            >
+              {isLoading
+                ? <Loader2 className="w-4 h-4 animate-spin" />
+                : <RefreshCw className="w-4 h-4 text-muted-foreground" />}
+            </Button>
+          )}
         </div>
 
         <Button

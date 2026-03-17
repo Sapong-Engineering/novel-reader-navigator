@@ -1,4 +1,13 @@
-project_id = "zbhbghpxgswsvkefhufl"
+project_id = "zwnpgqmevsaoetbrtrtg"
 
 [functions.openai-tts]
+verify_jwt = false
+
+[functions.admin-api]
+verify_jwt = false
+
+[functions.scrape-chapter]
+verify_jwt = false
+
+[functions.scrape-novel]
 verify_jwt = false

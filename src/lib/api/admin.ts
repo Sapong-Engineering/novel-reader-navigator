@@ -36,6 +36,16 @@ async function adminCall(action: string, params: Record<string, any> = {}) {
   return data?.data;
 }
 
+export interface CleaningRule {
+  id: string;
+  pattern: string;
+  flags: string;
+  description: string;
+  source_url: string | null;
+  created_at: string;
+  created_by: string | null; // null = AI-generated
+}
+
 export const adminApi = {
   getStats: (): Promise<AdminStats> => adminCall('stats'),
   listUsers: (): Promise<AdminUser[]> => adminCall('list-users'),
@@ -46,4 +56,6 @@ export const adminApi = {
   removeRole: (userId: string, role: string) => adminCall('remove-role', { userId, role }),
   getSettings: (): Promise<Record<string, any>> => adminCall('get-settings'),
   updateSetting: (key: string, value: any) => adminCall('update-setting', { key, value }),
+  listCleaningRules: (): Promise<CleaningRule[]> => adminCall('list-cleaning-rules'),
+  deleteCleaningRule: (ruleId: string) => adminCall('delete-cleaning-rule', { ruleId }),
 };

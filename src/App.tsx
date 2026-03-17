@@ -12,35 +12,40 @@ const Auth = lazy(() => import("./pages/Auth"));
 const Admin = lazy(() => import("./pages/Admin"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 import SyncErrorBanner from "./components/SyncErrorBanner";
+import AnnouncementBanner from "./components/AnnouncementBanner";
 import { ThemeProvider } from "./contexts/ThemeContext";
 import { ReaderProvider } from "./contexts/ReaderContext";
 import { AppSettingsProvider } from "./contexts/AppSettingsContext";
+import { AdminPublicSettingsProvider } from "./contexts/AdminPublicSettingsContext";
 
 const queryClient = new QueryClient();
 
 const App = () => (
   <ErrorBoundary>
     <ThemeProvider>
-      <AppSettingsProvider>
-        <ReaderProvider>
-          <QueryClientProvider client={queryClient}>
-            <TooltipProvider>
-              <Toaster />
-              <Sonner />
-              <SyncErrorBanner />
-              <BrowserRouter>
-                <Routes>
-                <Route path="/" element={<Index />} />
-                  <Route path="/auth" element={<Suspense fallback={null}><Auth /></Suspense>} />
-                  <Route path="/admin" element={<Suspense fallback={null}><Admin /></Suspense>} />
-                  <Route path="/reader/:novelId" element={<Suspense fallback={null}><Reader /></Suspense>} />
-                  <Route path="*" element={<Suspense fallback={null}><NotFound /></Suspense>} />
-                </Routes>
-              </BrowserRouter>
-            </TooltipProvider>
-          </QueryClientProvider>
-        </ReaderProvider>
-      </AppSettingsProvider>
+      <AdminPublicSettingsProvider>
+        <AppSettingsProvider>
+          <ReaderProvider>
+            <QueryClientProvider client={queryClient}>
+              <TooltipProvider>
+                <Toaster />
+                <Sonner />
+                <AnnouncementBanner />
+                <SyncErrorBanner />
+                <BrowserRouter>
+                  <Routes>
+                    <Route path="/" element={<Index />} />
+                    <Route path="/auth" element={<Suspense fallback={null}><Auth /></Suspense>} />
+                    <Route path="/admin" element={<Suspense fallback={null}><Admin /></Suspense>} />
+                    <Route path="/reader/:novelId" element={<Suspense fallback={null}><Reader /></Suspense>} />
+                    <Route path="*" element={<Suspense fallback={null}><NotFound /></Suspense>} />
+                  </Routes>
+                </BrowserRouter>
+              </TooltipProvider>
+            </QueryClientProvider>
+          </ReaderProvider>
+        </AppSettingsProvider>
+      </AdminPublicSettingsProvider>
     </ThemeProvider>
   </ErrorBoundary>
 );

@@ -1,6 +1,7 @@
 import { useState, useRef, useCallback } from 'react';
 import { Navigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
+import { useAdminPublicSettings } from '@/contexts/AdminPublicSettingsContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -13,6 +14,7 @@ const LOCKOUT_MS = 60_000; // 1 minute lockout
 
 const Auth = () => {
   const { user, loading } = useAuth();
+  const { registrationOpen } = useAdminPublicSettings();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -63,6 +65,10 @@ const Auth = () => {
       return;
     }
     if (mode === 'signup') {
+      if (!registrationOpen) {
+        toast.error('New registrations are currently closed.');
+        return;
+      }
       const pwError = validatePassword(password);
       if (pwError) {
         toast.error(pwError);
@@ -104,7 +110,9 @@ const Auth = () => {
         <Tabs defaultValue="login" className="w-full">
           <TabsList className="grid w-full grid-cols-2">
             <TabsTrigger value="login">Sign In</TabsTrigger>
-            <TabsTrigger value="signup">Sign Up</TabsTrigger>
+            <TabsTrigger value="signup" disabled={!registrationOpen}>
+              Sign Up{!registrationOpen ? ' (Closed)' : ''}
+            </TabsTrigger>
           </TabsList>
 
           <TabsContent value="login" className="space-y-4 mt-4">

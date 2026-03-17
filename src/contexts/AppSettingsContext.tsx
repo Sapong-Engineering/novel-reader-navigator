@@ -1,5 +1,6 @@
-import { createContext, useContext, useState, useCallback, useEffect } from 'react';
+import { createContext, useContext, useState, useCallback, useEffect, useRef } from 'react';
 import type { ReactNode } from 'react';
+import { supabase } from '@/integrations/supabase/client';
 
 export interface AppSettings {
   syncEnabled: boolean;
@@ -50,6 +51,31 @@ const AppSettingsContext = createContext<AppSettingsContextValue | undefined>(un
 
 export function AppSettingsProvider({ children }: { children: ReactNode }) {
   const [settings, setSettings] = useState<AppSettings>(load);
+  // Track whether the user has already saved explicit preferences
+  const hasStoredPrefs = useRef(localStorage.getItem(STORAGE_KEY) !== null);
+
+  // Fetch admin defaults once on mount — only apply if user has no stored prefs
+  useEffect(() => {
+    if (hasStoredPrefs.current) return;
+    supabase
+      .from('admin_settings')
+      .select('key, value')
+      .in('key', ['default_notifications', 'default_refresh_interval'])
+      .then(({ data }) => {
+        if (!data?.length) return;
+        const map: Record<string, unknown> = {};
+        for (const row of data) map[row.key] = row.value;
+        setSettings(prev => ({
+          ...prev,
+          ...(map.default_notifications !== undefined
+            ? { notificationsEnabled: map.default_notifications === true || map.default_notifications === 'true' }
+            : {}),
+          ...(map.default_refresh_interval !== undefined
+            ? { refreshIntervalHours: Math.max(1, Math.min(168, Number(map.default_refresh_interval) || 24)) }
+            : {}),
+        }));
+      });
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => { persist(settings); }, [settings]);
 

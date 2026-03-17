@@ -176,6 +176,11 @@ const Reader = () => {
     try {
       let content = await fetchChapterContentFromBackend(novelIdStr, chapter.id);
       if (!content) {
+        if (/gutenberg\.org/i.test(chapter.url)) {
+          toast.error('Chapter content not found. Re-fetch the novel to reload Gutenberg chapters.');
+          setIsLoadingChapter(false);
+          return;
+        }
         content = await scrapeChapterContent(chapter.url);
       }
       const updated: Chapter = { ...chapter, content, savedAt: new Date().toISOString() };
@@ -257,6 +262,28 @@ const Reader = () => {
     },
     [removeBookmark, novelIdStr],
   );
+
+  const handleRefetchChapter = useCallback(async () => {
+    if (!activeChapter || !novel) return;
+    setIsLoadingChapter(true);
+    try {
+      const content = await scrapeChapterContent(activeChapter.url);
+      const updated: Chapter = { ...activeChapter, content, savedAt: new Date().toISOString() };
+      setActiveChapter(updated);
+      setNovel(prev => {
+        if (!prev) return prev;
+        const newNovel = { ...prev, chapters: prev.chapters.map(c => c.id === activeChapter.id ? updated : c) };
+        saveNovel(newNovel);
+        syncNovel(newNovel);
+        return newNovel;
+      });
+      toast.success('Chapter re-fetched');
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Re-fetch failed');
+    } finally {
+      setIsLoadingChapter(false);
+    }
+  }, [activeChapter, novel]);
 
   const handleFetchAll = useCallback(async () => {
     if (!novel || isFetchingAll) return;
@@ -413,6 +440,7 @@ const Reader = () => {
               ttsCurrentIndex={tts.isPlaying || tts.isPaused ? tts.currentIndex : -1}
               isImmersive={immersive.isImmersive}
               tts={tts}
+              onRefetchChapter={activeChapter ? handleRefetchChapter : undefined}
             />
           </ErrorBoundary>
         </div>

@@ -1,0 +1,1 @@
+import{ak as n}from"./index-Db18GNHp.js";import"./vendor-query-D8pzKTZj.js";import"./vendor-react-b_EB6AHB.js";import"./vendor-export-C7vfYLe9.js";import"./vendor-ui-Cmcpwqcr.js";import"./vendor-charts-IVRChJDc.js";class a extends n{async show(e){}async hide(e){}}export{a as SplashScreenWeb};

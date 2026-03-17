@@ -275,13 +275,13 @@ function applyStructuralCleaning(content: string): string {
  * any such Markdown is noise from ads, banners, or promotional widgets.
  */
 function removeInlineMedia(content: string): string {
+  // Normalize Windows line endings so all steps use consistent \n
+  content = content.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+
   // Step A: Strip compound image-links [![img](imgUrl) text](linkUrl)
   // The `s` flag (dotAll) lets . match \n so multi-line widgets are caught.
-  //
-  // Middle section uses (?:[^\]]|\](?!\(https?:\/\/))*? instead of [^\]]*?
-  // so it can consume ] characters from nested inner images (e.g. ![alt](url)
-  // inside the outer [...]). It only stops at ] when immediately followed by
-  // https?://, which is the outer link URL — not an inner image URL.
+  // Middle section uses (?:[^\]]|\](?!\(https?:\/\/))*? to skip over nested ]
+  // from inner images without stopping prematurely.
   content = content.replace(/\[!\[[^\]]*?\]\([^)]+?\)(?:[^\]]|\](?!\(https?:\/\/))*?\]\(https?:\/\/[^)]+?\)/gs, '');
 
   // Step B: Strip remaining standalone markdown images ![alt](url)
@@ -290,17 +290,21 @@ function removeInlineMedia(content: string): string {
   // Step C: Strip orphaned link wrappers left after image removal [  \ ](url)
   content = content.replace(/\[[\s\\]*\]\(https?:\/\/[^)]+?\)/g, '');
 
-  // Step D: Remove lines that are only backslash characters (Firecrawl <br> artifacts).
-  // Also removes short label+backslash lines like "Before\\" or "After\\" that
-  // are orphaned ad image captions left when Steps A/B strip the surrounding widget.
-  content = content.replace(/^\w[\w\s\-]{0,20}\\{1,2}\s*$/gm, '');
+  // Step D: Remove ALL lines ending with backslash (Firecrawl <br> artifacts,
+  // including ad caption lines with punctuation like "Description text!\\").
+  content = content.replace(/^.+\\{1,2}\s*$/gm, '');
   content = content.replace(/^\\{1,2}\s*$/gm, '');
 
-  // Step E: Remove orphaned ad closing brackets — lines ending with ](url) that
-  // have no [ opener on the same line. These are tails of compound ad widgets
-  // that survived Steps A–D (e.g. "After - AI Enhanced](https://bestphoto.ai/…)").
-  // [^\[\n]* excludes \n so the match is confined to a single line.
+  // Step E: Orphaned closing brackets — lines ending with ](url) with no [ opener.
+  // [^\[\n]* excludes \n to keep match on a single line.
   content = content.replace(/^[^\[\n]*\]\(https?:\/\/[^)]+\)\s*$/gm, '');
+
+  // Step F: EasyPic AI image generator ads — title repeated verbatim followed by
+  // a "Made with '<model>' Model" attribution line. Firecrawl may emit these with
+  // single \n (br-style) or double \n\n (paragraph-style) separators, so we
+  // match \n{1,2} between parts. Model name uses [^\n]+ to tolerate any quote style.
+  // e.g. "Reveal Character!\n\nReveal Character!\n\nMade with 'SeekAstral v1.0' Model"
+  content = content.replace(/^([^\n]+)\n{1,2}\1\n{1,2}Made with [^\n]+ Model[ \t]*$/gm, '');
 
   return content;
 }

@@ -1,6 +1,7 @@
-import { createContext, useContext } from 'react';
+import { createContext, useContext, useEffect } from 'react';
 import type { ReactNode } from 'react';
 import { ThemeProvider as NextThemesProvider, useTheme } from 'next-themes';
+import { supabase } from '@/integrations/supabase/client';
 
 export interface ThemeContextValue {
   theme: string | undefined;
@@ -10,6 +11,29 @@ export interface ThemeContextValue {
 }
 
 const ThemeContext = createContext<ThemeContextValue | undefined>(undefined);
+
+/** Applies admin's default_theme once on mount — only if the user hasn't already
+ *  picked their own theme. Runs inside NextThemesProvider so setTheme is available. */
+function AdminThemeApplier() {
+  const { setTheme } = useTheme();
+
+  useEffect(() => {
+    const userHasTheme = localStorage.getItem('novel-reader-theme') !== null;
+    if (userHasTheme) return;
+
+    supabase
+      .from('admin_settings')
+      .select('value')
+      .eq('key', 'default_theme')
+      .maybeSingle()
+      .then(({ data }) => {
+        const v = String(data?.value ?? '');
+        if (['light', 'dark', 'system'].includes(v)) setTheme(v);
+      });
+  }, [setTheme]);
+
+  return null;
+}
 
 function ThemeContextBridge({ children }: { children: ReactNode }) {
   const { theme, setTheme, resolvedTheme } = useTheme();
@@ -33,6 +57,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
       enableSystem
       storageKey="novel-reader-theme"
     >
+      <AdminThemeApplier />
       <ThemeContextBridge>{children}</ThemeContextBridge>
     </NextThemesProvider>
   );
