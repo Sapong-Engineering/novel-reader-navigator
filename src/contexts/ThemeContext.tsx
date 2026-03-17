@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useEffect } from 'react';
+import { createContext, useContext, useEffect } from 'react';
 import type { ReactNode } from 'react';
 import { ThemeProvider as NextThemesProvider, useTheme } from 'next-themes';
 import { supabase } from '@/integrations/supabase/client';
@@ -11,6 +11,29 @@ export interface ThemeContextValue {
 }
 
 const ThemeContext = createContext<ThemeContextValue | undefined>(undefined);
+
+/** Applies admin's default_theme once on mount — only if the user hasn't already
+ *  picked their own theme. Runs inside NextThemesProvider so setTheme is available. */
+function AdminThemeApplier() {
+  const { setTheme } = useTheme();
+
+  useEffect(() => {
+    const userHasTheme = localStorage.getItem('novel-reader-theme') !== null;
+    if (userHasTheme) return;
+
+    supabase
+      .from('admin_settings')
+      .select('value')
+      .eq('key', 'default_theme')
+      .maybeSingle()
+      .then(({ data }) => {
+        const v = String(data?.value ?? '');
+        if (['light', 'dark', 'system'].includes(v)) setTheme(v);
+      });
+  }, [setTheme]);
+
+  return null;
+}
 
 function ThemeContextBridge({ children }: { children: ReactNode }) {
   const { theme, setTheme, resolvedTheme } = useTheme();
@@ -27,40 +50,14 @@ function ThemeContextBridge({ children }: { children: ReactNode }) {
 }
 
 export function ThemeProvider({ children }: { children: ReactNode }) {
-  // Default to 'system' until admin setting is loaded
-  const [defaultTheme, setDefaultTheme] = useState<string>('system');
-  const [ready, setReady] = useState(false);
-
-  useEffect(() => {
-    // Only apply admin default_theme if user hasn't already set their own preference
-    const userHasTheme = localStorage.getItem('novel-reader-theme') !== null;
-    if (userHasTheme) {
-      setReady(true);
-      return;
-    }
-    supabase
-      .from('admin_settings')
-      .select('value')
-      .eq('key', 'default_theme')
-      .maybeSingle()
-      .then(({ data }) => {
-        if (data?.value && ['light', 'dark', 'system'].includes(String(data.value))) {
-          setDefaultTheme(String(data.value));
-        }
-        setReady(true);
-      });
-  }, []);
-
-  // Don't render until we know the correct defaultTheme to avoid flash
-  if (!ready) return null;
-
   return (
     <NextThemesProvider
       attribute="class"
-      defaultTheme={defaultTheme}
+      defaultTheme="system"
       enableSystem
       storageKey="novel-reader-theme"
     >
+      <AdminThemeApplier />
       <ThemeContextBridge>{children}</ThemeContextBridge>
     </NextThemesProvider>
   );
