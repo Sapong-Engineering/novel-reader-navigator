@@ -1,5 +1,6 @@
 import { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import type { ReactNode } from 'react';
+import { supabase } from '@/integrations/supabase/client';
 
 export interface ReaderSettings {
   fontSize: number;
@@ -13,25 +14,31 @@ export interface ReaderContextValue {
   resetSettings: () => void;
 }
 
-const DEFAULT_SETTINGS: ReaderSettings = {
+// Absolute fallback when neither admin settings nor user overrides are present
+const HARDCODED_DEFAULTS: ReaderSettings = {
   fontSize: 16,
   fontFamily: 'serif',
 };
 
+// Only user-explicitly-chosen values live here (partial — only keys they've changed)
 const STORAGE_KEY = 'novel-reader-settings';
 
-const ReaderContext = createContext<ReaderContextValue | undefined>(undefined);
-
-function loadSettings(): ReaderSettings {
+function loadUserOverrides(): Partial<ReaderSettings> {
   try {
-    const stored = localStorage.getItem(STORAGE_KEY);
-    if (stored) {
-      return { ...DEFAULT_SETTINGS, ...JSON.parse(stored) };
-    }
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (raw) return JSON.parse(raw);
   } catch {
     // ignore
   }
-  return DEFAULT_SETTINGS;
+  return {};
+}
+
+function saveUserOverrides(overrides: Partial<ReaderSettings>) {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(overrides));
+  } catch {
+    // ignore
+  }
 }
 
 function applySettings(settings: ReaderSettings): void {
@@ -39,29 +46,59 @@ function applySettings(settings: ReaderSettings): void {
   document.documentElement.style.setProperty('--reader-font-family', settings.fontFamily);
 }
 
-export function ReaderProvider({ children }: { children: ReactNode }) {
-  const [settings, setSettings] = useState<ReaderSettings>(loadSettings);
+const ReaderContext = createContext<ReaderContextValue | undefined>(undefined);
 
+export function ReaderProvider({ children }: { children: ReactNode }) {
+  const [adminDefaults, setAdminDefaults] = useState<ReaderSettings>(HARDCODED_DEFAULTS);
+  const [userOverrides, setUserOverrides] = useState<Partial<ReaderSettings>>(loadUserOverrides);
+
+  // Effective settings: admin defaults as base, user overrides on top
+  const settings: ReaderSettings = { ...adminDefaults, ...userOverrides };
+
+  // Fetch admin defaults once on mount — applies to users without explicit preferences
+  useEffect(() => {
+    supabase
+      .from('admin_settings')
+      .select('key, value')
+      .in('key', ['default_font_size', 'default_font_family'])
+      .then(({ data }) => {
+        if (!data?.length) return;
+        const map: Record<string, string> = {};
+        for (const row of data) map[row.key] = String(row.value);
+        setAdminDefaults(prev => ({
+          ...prev,
+          ...(map.default_font_size ? { fontSize: Math.min(24, Math.max(12, Number(map.default_font_size))) } : {}),
+          ...(map.default_font_family ? { fontFamily: map.default_font_family as ReaderSettings['fontFamily'] } : {}),
+        }));
+      });
+  }, []);
+
+  // Apply CSS vars whenever effective settings change
   useEffect(() => {
     applySettings(settings);
-    try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(settings));
-    } catch {
-      // ignore storage errors
-    }
   }, [settings]);
 
   const setFontSize = useCallback((size: number) => {
     const clamped = Math.min(24, Math.max(12, size));
-    setSettings(prev => ({ ...prev, fontSize: clamped }));
+    setUserOverrides(prev => {
+      const next = { ...prev, fontSize: clamped };
+      saveUserOverrides(next);
+      return next;
+    });
   }, []);
 
   const setFontFamily = useCallback((family: ReaderSettings['fontFamily']) => {
-    setSettings(prev => ({ ...prev, fontFamily: family }));
+    setUserOverrides(prev => {
+      const next = { ...prev, fontFamily: family };
+      saveUserOverrides(next);
+      return next;
+    });
   }, []);
 
+  // Reset clears user overrides so admin defaults take effect immediately
   const resetSettings = useCallback(() => {
-    setSettings(DEFAULT_SETTINGS);
+    setUserOverrides({});
+    try { localStorage.removeItem(STORAGE_KEY); } catch { /* ignore */ }
   }, []);
 
   return (

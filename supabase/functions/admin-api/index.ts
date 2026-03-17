@@ -211,6 +211,27 @@ Deno.serve(async (req) => {
         break;
       }
 
+      case 'list-cleaning-rules': {
+        const { data: rules } = await adminClient
+          .from('cleaning_rules')
+          .select('id, pattern, flags, description, source_url, created_at, created_by')
+          .order('created_at', { ascending: false });
+        result = rules ?? [];
+        break;
+      }
+
+      case 'delete-cleaning-rule': {
+        const { ruleId } = params;
+        if (!ruleId) throw new Error('ruleId required');
+        const { error: delErr } = await adminClient
+          .from('cleaning_rules')
+          .delete()
+          .eq('id', ruleId);
+        if (delErr) throw delErr;
+        result = { success: true };
+        break;
+      }
+
       default:
         return new Response(JSON.stringify({ error: `Unknown action: ${action}` }), {
           status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
