@@ -51,6 +51,10 @@ export function useTTS(onChapterEnd?: () => void) {
   const isPlayingRef = useRef(false);
   const speedRef = useRef(speed);
   const voiceRef = useRef(selectedVoice);
+  // Refs for auto-advance values — always current, avoids stale-closure issues in the
+  // recursive onended/onend chain where the same (old) playAiParagraph closure is reused.
+  const autoAdvanceRef = useRef(autoAdvance);
+  const onChapterEndRef = useRef(onChapterEnd);
   // Single persistent audio element — iOS keeps user-activated status on it across src changes.
   // Nulled only on unmount; never nulled during normal stop/jump operations.
   const audioRef = useRef<HTMLAudioElement | null>(null);
@@ -68,6 +72,8 @@ export function useTTS(onChapterEnd?: () => void) {
   voiceRef.current = selectedVoice;
   engineRef.current = ttsEngine;
   aiVoiceRef.current = selectedAiVoice;
+  autoAdvanceRef.current = autoAdvance;
+  onChapterEndRef.current = onChapterEnd;
 
   // Initialize single persistent audio element on mount.
   // Reusing the same element across paragraphs is the key iOS fix:
@@ -178,7 +184,7 @@ export function useTTS(onChapterEnd?: () => void) {
       setIsPaused(false);
       setIsAiLoading(false);
       isPlayingRef.current = false;
-      if (autoAdvance) onChapterEnd?.();
+      if (autoAdvanceRef.current) onChapterEndRef.current?.();
       return;
     }
 
@@ -255,7 +261,7 @@ export function useTTS(onChapterEnd?: () => void) {
       setIsAiLoading(false);
       isPlayingRef.current = false;
     }
-  }, [autoAdvance, onChapterEnd, fetchAiAudioWithRetry, prefetchNext]);
+  }, [fetchAiAudioWithRetry, prefetchNext]);
 
   // --- Browser TTS ---
   const speakParagraph = useCallback((index: number) => {
@@ -263,7 +269,7 @@ export function useTTS(onChapterEnd?: () => void) {
       setIsPlaying(false);
       setIsPaused(false);
       isPlayingRef.current = false;
-      if (autoAdvance) onChapterEnd?.();
+      if (autoAdvanceRef.current) onChapterEndRef.current?.();
       return;
     }
 
@@ -289,7 +295,7 @@ export function useTTS(onChapterEnd?: () => void) {
     utteranceRef.current = utterance;
     setCurrentIndex(index);
     speechSynthesis.speak(utterance);
-  }, [autoAdvance, onChapterEnd]);
+  }, []);
 
   const play = useCallback(() => {
     const engine = engineRef.current;
