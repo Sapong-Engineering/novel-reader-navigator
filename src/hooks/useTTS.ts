@@ -1,4 +1,5 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
+import { supabase } from '@/integrations/supabase/client';
 
 export type TTSSpeed = 0.5 | 0.75 | 1 | 1.25 | 1.5 | 2;
 export type TTSEngine = 'browser' | 'ai';
@@ -101,12 +102,14 @@ export function useTTS(onChapterEnd?: () => void) {
 
   // --- AI TTS helpers ---
   const fetchAiAudio = useCallback(async (text: string): Promise<Blob> => {
+    const { data: { session } } = await supabase.auth.getSession();
+    const token = session?.access_token ?? import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
     const url = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/openai-tts`;
     const resp = await fetch(url, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+        Authorization: `Bearer ${token}`,
       },
       body: JSON.stringify({
         text,
