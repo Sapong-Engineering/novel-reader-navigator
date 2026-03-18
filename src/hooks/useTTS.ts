@@ -125,6 +125,7 @@ export function useTTS(onChapterEnd?: () => void) {
       .filter(p => p.length > 0);
     paragraphsRef.current = paras;
     setCurrentIndex(0);
+    currentIndexRef.current = 0;
     prefetchRef.current = null;
   }, []);
 
@@ -328,11 +329,11 @@ export function useTTS(onChapterEnd?: () => void) {
     isPlayingRef.current = true;
 
     if (engine === 'ai') {
-      playAiParagraph(currentIndex);
+      playAiParagraph(currentIndexRef.current);
     } else {
-      speakParagraph(currentIndex);
+      speakParagraph(currentIndexRef.current);
     }
-  }, [isPaused, currentIndex, speakParagraph, playAiParagraph]);
+  }, [isPaused, speakParagraph, playAiParagraph]);
 
   const pause = useCallback(() => {
     if (engineRef.current === 'ai' && audioRef.current) {

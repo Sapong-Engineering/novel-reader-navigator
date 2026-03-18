@@ -45,6 +45,7 @@ const Reader = () => {
   const [isDesktopSidebarOpen, setIsDesktopSidebarOpen] = useState<boolean>(getInitialDesktopSidebarState);
   const pendingScrollRef = useRef<number | null>(null);
   const forceScrollTopRef = useRef(false);
+  const pendingTtsAutoPlayRef = useRef(false);
 
   const appSettings = useAppSettings();
   const immersive = useImmersiveMode();
@@ -77,15 +78,22 @@ const Reader = () => {
     handleNavSelectChapter,
   );
 
-  // TTS with auto-advance to next chapter
-  const tts = useTTS(hasNext ? goToNext : undefined);
+  // TTS with auto-advance to next chapter — wrapper sets auto-play flag before navigating
+  const handleTtsChapterEnd = useCallback(() => {
+    pendingTtsAutoPlayRef.current = true;
+    goToNext();
+  }, [goToNext]);
+  const tts = useTTS(hasNext ? handleTtsChapterEnd : undefined);
 
-  // Set TTS paragraphs when chapter changes and restore saved position
+  // Set TTS paragraphs when chapter changes, restore saved position, and auto-play if advancing
   useEffect(() => {
     if (activeChapter?.content) {
       tts.setParagraphs(activeChapter.content);
+      const shouldAutoPlay = pendingTtsAutoPlayRef.current;
+      pendingTtsAutoPlayRef.current = false;
       ttsProgress.getRestoredIndex().then(savedIndex => {
         if (savedIndex > 0) tts.jumpTo(savedIndex);
+        if (shouldAutoPlay) tts.play();
       });
     }
   }, [activeChapter?.id, activeChapter?.content]); // eslint-disable-line react-hooks/exhaustive-deps
