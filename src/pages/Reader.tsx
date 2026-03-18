@@ -16,6 +16,7 @@ import { useBookmarks } from '@/hooks/useBookmarks';
 import { useImmersiveMode } from '@/hooks/useImmersiveMode';
 import { useReadingStats } from '@/hooks/useReadingStats';
 import { useTTS } from '@/hooks/useTTS';
+import { useTTSProgress } from '@/hooks/useTTSProgress';
 import { validateUrl } from '@/lib/validation';
 import { scrapeChapterContent } from '@/lib/api/firecrawl';
 import { orderChapters } from '@/lib/chapter-order';
@@ -79,10 +80,13 @@ const Reader = () => {
   // TTS with auto-advance to next chapter
   const tts = useTTS(hasNext ? goToNext : undefined);
 
-  // Set TTS paragraphs when chapter changes
+  // Set TTS paragraphs when chapter changes and restore saved position
   useEffect(() => {
     if (activeChapter?.content) {
       tts.setParagraphs(activeChapter.content);
+      ttsProgress.getRestoredIndex().then(savedIndex => {
+        if (savedIndex > 0) tts.jumpTo(savedIndex);
+      });
     }
   }, [activeChapter?.id, activeChapter?.content]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -91,6 +95,21 @@ const Reader = () => {
     novelIdStr,
     activeChapter?.id,
   );
+  const ttsProgress = useTTSProgress(novelIdStr, activeChapter?.id);
+
+  // Persist TTS paragraph position while playing
+  useEffect(() => {
+    if (tts.isPlaying || tts.isPaused) {
+      ttsProgress.saveTtsIndex(tts.currentIndex);
+    }
+  }, [tts.currentIndex]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Flush save immediately on pause so cross-device restore is up to date
+  useEffect(() => {
+    if (tts.isPaused) {
+      ttsProgress.saveTtsIndexNow(tts.currentIndex);
+    }
+  }, [tts.isPaused]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const {
     bookmarks,

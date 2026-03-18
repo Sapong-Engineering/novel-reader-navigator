@@ -201,3 +201,34 @@ export function saveLastReadChapter(novelId: string, chapterId: string): void {
     updatedAt: new Date().toISOString(),
   }));
 }
+
+export interface TtsProgressEntry {
+  paragraphIndex: number;
+  updatedAt: string | null;
+}
+
+export function getTtsProgressEntry(novelId: string, chapterId: string): TtsProgressEntry {
+  const key = `tts-progress:${novelId}:${chapterId}`;
+  const stored = localStorage.getItem(key);
+  if (!stored) return { paragraphIndex: 0, updatedAt: null };
+
+  try {
+    const parsed = JSON.parse(stored);
+    if (parsed && typeof parsed === 'object') {
+      return {
+        paragraphIndex: typeof parsed.paragraphIndex === 'number' ? parsed.paragraphIndex : 0,
+        updatedAt: typeof parsed.updatedAt === 'string' ? parsed.updatedAt : null,
+      };
+    }
+  } catch {}
+
+  return { paragraphIndex: 0, updatedAt: null };
+}
+
+export function saveTtsProgress(novelId: string, chapterId: string, paragraphIndex: number): void {
+  const key = `tts-progress:${novelId}:${chapterId}`;
+  localStorage.setItem(key, JSON.stringify({
+    paragraphIndex,
+    updatedAt: new Date().toISOString(),
+  }));
+}

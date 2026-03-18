@@ -66,6 +66,11 @@ export interface RemoteChapterProgress {
   updatedAt: string;
 }
 
+export interface RemoteTtsProgress {
+  paragraphIndex: number;
+  updatedAt: string;
+}
+
 function flushProgressSync() {
   if (!pendingProgress) return;
   const p = pendingProgress;
@@ -189,6 +194,85 @@ export async function fetchReadingPositionForChapterFromBackend(
     };
   } catch (err) {
     console.error('Failed to fetch chapter reading position:', err);
+    return null;
+  }
+}
+
+// ── Debounced TTS progress sync ──
+
+let ttsProgressTimer: ReturnType<typeof setTimeout> | null = null;
+let pendingTtsProgress: { novelLocalId: string; chapterLocalId: string; paragraphIndex: number } | null = null;
+
+function flushTtsProgressSync() {
+  if (!pendingTtsProgress) return;
+  const p = pendingTtsProgress;
+  pendingTtsProgress = null;
+  _syncTtsProgressToBackend(p.novelLocalId, p.chapterLocalId, p.paragraphIndex);
+}
+
+export function syncTtsProgressToBackend(
+  novelLocalId: string,
+  chapterLocalId: string,
+  paragraphIndex: number,
+): void {
+  pendingTtsProgress = { novelLocalId, chapterLocalId, paragraphIndex };
+  if (ttsProgressTimer) clearTimeout(ttsProgressTimer);
+  ttsProgressTimer = setTimeout(flushTtsProgressSync, 2000);
+}
+
+async function _syncTtsProgressToBackend(
+  novelLocalId: string,
+  chapterLocalId: string,
+  paragraphIndex: number,
+): Promise<void> {
+  const userId = await getUserId();
+  if (!userId) return;
+  try {
+    const novelUuid = await resolveNovelUuid(novelLocalId, userId);
+    if (!novelUuid) return;
+
+    await supabase
+      .from('reading_progress')
+      .upsert({
+        user_id: userId,
+        novel_id: novelUuid,
+        chapter_local_id: chapterLocalId,
+        tts_paragraph_index: paragraphIndex,
+        updated_at: new Date().toISOString(),
+      }, { onConflict: 'user_id,novel_id,chapter_local_id' });
+  } catch (err) {
+    console.error('Failed to sync TTS progress:', err);
+  }
+}
+
+export async function fetchTtsParagraphIndexFromBackend(
+  novelLocalId: string,
+  chapterLocalId: string,
+): Promise<RemoteTtsProgress | null> {
+  if (!isSyncEnabled()) return null;
+  const userId = await getUserId();
+  if (!userId) return null;
+
+  try {
+    const novelUuid = await resolveNovelUuid(novelLocalId, userId);
+    if (!novelUuid) return null;
+
+    const { data, error } = await supabase
+      .from('reading_progress')
+      .select('tts_paragraph_index, updated_at')
+      .eq('novel_id', novelUuid)
+      .eq('user_id', userId)
+      .eq('chapter_local_id', chapterLocalId)
+      .maybeSingle();
+
+    if (error || !data || data.tts_paragraph_index == null) return null;
+
+    return {
+      paragraphIndex: data.tts_paragraph_index,
+      updatedAt: data.updated_at,
+    };
+  } catch (err) {
+    console.error('Failed to fetch TTS progress:', err);
     return null;
   }
 }
