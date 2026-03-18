@@ -296,10 +296,11 @@ export function useTTS(onChapterEnd?: () => void) {
 
     if (isPaused) {
       if (engine === 'ai' && audioRef.current) {
+        // Set before play() so any onpause from the resumed element is handled correctly
+        isPlayingRef.current = true;
         audioRef.current.play().catch(() => {});
         setIsPaused(false);
         setIsPlaying(true);
-        isPlayingRef.current = true;
         return;
       }
       speechSynthesis.resume();
@@ -329,6 +330,10 @@ export function useTTS(onChapterEnd?: () => void) {
 
   const pause = useCallback(() => {
     if (engineRef.current === 'ai' && audioRef.current) {
+      // Must be set BEFORE audioRef.current.pause() so the onpause handler
+      // (which auto-resumes iOS background pauses) sees isPlayingRef = false
+      // and does not treat this intentional pause as an unexpected one.
+      isPlayingRef.current = false;
       audioRef.current.pause();
     } else {
       speechSynthesis.pause();
