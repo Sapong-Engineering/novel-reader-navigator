@@ -51,7 +51,11 @@ export function useTTS(onChapterEnd?: () => void) {
   const isPlayingRef = useRef(false);
   const speedRef = useRef(speed);
   const voiceRef = useRef(selectedVoice);
+  // Single persistent audio element — iOS keeps user-activated status on it across src changes.
+  // Nulled only on unmount; never nulled during normal stop/jump operations.
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  // Tracks the blob: URL currently loaded into audioRef so we can revoke it properly.
+  const currentObjectUrlRef = useRef<string | null>(null);
   const prefetchRef = useRef<{ index: number; blob: Blob } | null>(null);
   const engineRef = useRef(ttsEngine);
   const aiVoiceRef = useRef(selectedAiVoice);
@@ -64,6 +68,24 @@ export function useTTS(onChapterEnd?: () => void) {
   voiceRef.current = selectedVoice;
   engineRef.current = ttsEngine;
   aiVoiceRef.current = selectedAiVoice;
+
+  // Initialize single persistent audio element on mount.
+  // Reusing the same element across paragraphs is the key iOS fix:
+  // iOS only grants "user-activated" playback rights to the original element that
+  // received the first user-gesture play(). Creating new Audio() per paragraph loses that.
+  useEffect(() => {
+    const audio = new Audio();
+    audioRef.current = audio;
+    return () => {
+      audio.pause();
+      audio.src = '';
+      audioRef.current = null;
+      if (currentObjectUrlRef.current) {
+        URL.revokeObjectURL(currentObjectUrlRef.current);
+        currentObjectUrlRef.current = null;
+      }
+    };
+  }, []);
 
   const setTtsEngine = useCallback((engine: TTSEngine) => {
     setTtsEngineState(engine);
@@ -139,6 +161,8 @@ export function useTTS(onChapterEnd?: () => void) {
 
   const prefetchNext = useCallback((nextIndex: number) => {
     if (nextIndex >= paragraphsRef.current.length) return;
+    // Don't start a redundant prefetch if we already have this index cached
+    if (prefetchRef.current?.index === nextIndex) return;
     const text = paragraphsRef.current[nextIndex];
     fetchAiAudio(text)
       .then(blob => { prefetchRef.current = { index: nextIndex, blob }; })
@@ -174,13 +198,26 @@ export function useTTS(onChapterEnd?: () => void) {
       // Abort if a newer call superseded us or playback was stopped
       if (myGeneration !== playGenerationRef.current || !isPlayingRef.current) return;
 
+      // Start prefetching the NEXT paragraph immediately after we have this blob.
+      // This maximises the chance the next blob is ready by the time onended fires,
+      // avoiding an await inside the callback (which breaks iOS gesture continuation).
+      prefetchNext(index + 1);
+
+      // Revoke the previous object URL now that we have the new blob ready.
+      if (currentObjectUrlRef.current) {
+        URL.revokeObjectURL(currentObjectUrlRef.current);
+      }
       const objectUrl = URL.createObjectURL(blob);
-      const audio = new Audio(objectUrl);
-      audioRef.current = audio;
+      currentObjectUrlRef.current = objectUrl;
+
+      const audio = audioRef.current;
+      if (!audio) return;
+
+      // Swap src on the SAME persistent element — iOS keeps user-activation across src changes.
+      audio.src = objectUrl;
       setIsAiLoading(false);
 
       audio.onended = () => {
-        URL.revokeObjectURL(objectUrl);
         if (!isPlayingRef.current || myGeneration !== playGenerationRef.current) return;
         const next = index + 1;
         setCurrentIndex(next);
@@ -189,7 +226,7 @@ export function useTTS(onChapterEnd?: () => void) {
       };
 
       audio.onerror = () => {
-        URL.revokeObjectURL(objectUrl);
+        if (myGeneration !== playGenerationRef.current) return;
         setIsPlaying(false);
         setIsAiLoading(false);
         isPlayingRef.current = false;
@@ -200,15 +237,18 @@ export function useTTS(onChapterEnd?: () => void) {
         if (isPlayingRef.current && myGeneration === playGenerationRef.current && !audio.ended) {
           setTimeout(() => {
             if (isPlayingRef.current && myGeneration === playGenerationRef.current && audio.paused && !audio.ended) {
-              audio.play().catch(() => {});
+              audio.play().catch(() => {
+                // iOS killed audio session even on persistent element — restart paragraph
+                if (isPlayingRef.current && myGeneration === playGenerationRef.current) {
+                  playAiParagraph(currentIndexRef.current);
+                }
+              });
             }
           }, 300);
         }
       };
 
       await audio.play();
-      // Prefetch next paragraph
-      prefetchNext(index + 1);
     } catch (err) {
       console.error('AI TTS error:', err);
       setIsPlaying(false);
@@ -256,7 +296,7 @@ export function useTTS(onChapterEnd?: () => void) {
 
     if (isPaused) {
       if (engine === 'ai' && audioRef.current) {
-        audioRef.current.play();
+        audioRef.current.play().catch(() => {});
         setIsPaused(false);
         setIsPlaying(true);
         isPlayingRef.current = true;
@@ -269,12 +309,12 @@ export function useTTS(onChapterEnd?: () => void) {
       return;
     }
 
-    // Stop any existing playback
+    // Stop any existing playback (don't null the audio element)
     speechSynthesis.cancel();
     if (audioRef.current) {
       audioRef.current.pause();
-      audioRef.current = null;
     }
+    prefetchRef.current = null;
 
     setIsPlaying(true);
     setIsPaused(false);
@@ -302,7 +342,8 @@ export function useTTS(onChapterEnd?: () => void) {
     speechSynthesis.cancel();
     if (audioRef.current) {
       audioRef.current.pause();
-      audioRef.current = null;
+      // Clear src to stop any pending network load but keep the element alive for iOS
+      audioRef.current.src = '';
     }
     prefetchRef.current = null;
     setIsPlaying(false);
@@ -310,17 +351,17 @@ export function useTTS(onChapterEnd?: () => void) {
     setIsAiLoading(false);
     isPlayingRef.current = false;
     setCurrentIndex(0);
+    currentIndexRef.current = 0;
   }, []);
 
   const jumpTo = useCallback((index: number) => {
     const wasPlaying = isPlayingRef.current || isPlaying;
-    // Invalidate any in-flight AI fetch and set false BEFORE pause so the onpause handler doesn't fire
+    // Invalidate any in-flight AI fetch BEFORE pausing so onpause handler sees mismatched generation
     playGenerationRef.current++;
     isPlayingRef.current = false;
     speechSynthesis.cancel();
     if (audioRef.current) {
       audioRef.current.pause();
-      audioRef.current = null;
     }
     prefetchRef.current = null;
     setCurrentIndex(index);
@@ -342,13 +383,13 @@ export function useTTS(onChapterEnd?: () => void) {
     const handleVisibilityChange = () => {
       if (document.visibilityState === 'visible' && isPlayingRef.current && engineRef.current === 'ai') {
         const audio = audioRef.current;
-        if (audio && audio.paused && !audio.ended) {
+        if (audio && audio.paused && !audio.ended && audio.src) {
           audio.play().catch(() => {
-            // Audio context was killed — restart from current paragraph
+            // Audio session destroyed — restart from current paragraph
             playAiParagraph(currentIndexRef.current);
           });
-        } else if (!audio) {
-          // No audio element — restart playback from where we left off
+        } else if (!audio?.src) {
+          // No src loaded — restart from current paragraph
           playAiParagraph(currentIndexRef.current);
         }
       }
@@ -356,18 +397,6 @@ export function useTTS(onChapterEnd?: () => void) {
     document.addEventListener('visibilitychange', handleVisibilityChange);
     return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
   }, [playAiParagraph]);
-
-  // Cleanup
-  useEffect(() => {
-    return () => {
-      speechSynthesis.cancel();
-      if (audioRef.current) {
-        audioRef.current.pause();
-        audioRef.current = null;
-      }
-      isPlayingRef.current = false;
-    };
-  }, []);
 
   return {
     isPlaying,
