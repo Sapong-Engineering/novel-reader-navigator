@@ -117,7 +117,7 @@ function cleanWuxiaClick(content: string): string {
   content = content.replace(/^Play\s*$/gim, '');
 
   // Remove lines that are just emoji(s) and/or whitespace
-  content = content.replace(/^[\s\p{Emoji_Presentation}\p{Extended_Pictographic}\u200d\ufe0f]+$/gmu, '');
+  content = content.replace(/^(?:\s|\p{Emoji_Presentation}|\p{Extended_Pictographic}|\u200d|\ufe0f)+$/gmu, '');
 
   // Remove lines that are just backslashes (escaped chars from scrape)
   content = content.replace(/^\\+\s*$/gm, '');
@@ -297,7 +297,7 @@ function removeInlineMedia(content: string): string {
 
   // Step E: Orphaned closing brackets — lines ending with ](url) with no [ opener.
   // [^\[\n]* excludes \n to keep match on a single line.
-  content = content.replace(/^[^\[\n]*\]\(https?:\/\/[^)]+\)\s*$/gm, '');
+  content = content.replace(/^[^[\n]*\]\(https?:\/\/[^)]+\)\s*$/gm, '');
 
   // Step F: EasyPic AI image generator ads — title repeated verbatim followed by
   // a "Made with '<model>' Model" attribution line. Firecrawl may emit these with

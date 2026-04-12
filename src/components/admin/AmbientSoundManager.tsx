@@ -52,8 +52,8 @@ const AmbientSoundManager = () => {
       if (error) throw error;
       toast.success(`${soundKey} sound uploaded`);
       setExisting(prev => ({ ...prev, [soundKey]: true }));
-    } catch (err: any) {
-      toast.error(`Upload failed: ${err.message}`);
+    } catch (err) {
+      toast.error(`Upload failed: ${err instanceof Error ? err.message : 'Unknown error'}`);
     } finally {
       setUploading(null);
     }
@@ -65,8 +65,8 @@ const AmbientSoundManager = () => {
       if (error) throw error;
       toast.success(`${soundKey} sound removed`);
       setExisting(prev => ({ ...prev, [soundKey]: false }));
-    } catch (err: any) {
-      toast.error(`Delete failed: ${err.message}`);
+    } catch (err) {
+      toast.error(`Delete failed: ${err instanceof Error ? err.message : 'Unknown error'}`);
     }
   };
 

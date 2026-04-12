@@ -28,7 +28,7 @@ function removeInlineMedia(content: string): string {
 
   // Step E: orphaned closing brackets — lines ending with ](url) with no [ opener
   // [^\[\n]* excludes \n to keep match on a single line.
-  content = content.replace(/^[^\[\n]*\]\(https?:\/\/[^)]+\)\s*$/gm, '');
+  content = content.replace(/^[^[\n]*\]\(https?:\/\/[^)]+\)\s*$/gm, '');
 
   // Step F: EasyPic AI image generator ads — title repeated verbatim + "Made with '...' Model"
   content = content.replace(/^([^\n]+)\n{1,2}\1\n{1,2}Made with [^\n]+ Model[ \t]*$/gm, '');

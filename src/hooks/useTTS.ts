@@ -25,13 +25,17 @@ function getStoredEngine(): TTSEngine {
   try {
     const v = localStorage.getItem(TTS_ENGINE_KEY);
     return v === 'ai' ? 'ai' : 'browser';
-  } catch { return 'browser'; }
+  } catch {
+    return 'browser';
+  }
 }
 
 function getStoredAiVoice(): string {
   try {
     return localStorage.getItem(TTS_AI_VOICE_KEY) || 'nova';
-  } catch { return 'nova'; }
+  } catch {
+    return 'nova';
+  }
 }
 
 export function useTTS(onChapterEnd?: () => void) {
@@ -95,12 +99,20 @@ export function useTTS(onChapterEnd?: () => void) {
 
   const setTtsEngine = useCallback((engine: TTSEngine) => {
     setTtsEngineState(engine);
-    try { localStorage.setItem(TTS_ENGINE_KEY, engine); } catch {}
+    try {
+      localStorage.setItem(TTS_ENGINE_KEY, engine);
+    } catch {
+      // Ignore local persistence failures for optional preferences.
+    }
   }, []);
 
   const setSelectedAiVoice = useCallback((voice: string) => {
     setSelectedAiVoiceState(voice);
-    try { localStorage.setItem(TTS_AI_VOICE_KEY, voice); } catch {}
+    try {
+      localStorage.setItem(TTS_AI_VOICE_KEY, voice);
+    } catch {
+      // Ignore local persistence failures for optional preferences.
+    }
   }, []);
 
   // Load browser voices
@@ -116,7 +128,7 @@ export function useTTS(onChapterEnd?: () => void) {
     loadVoices();
     speechSynthesis.addEventListener('voiceschanged', loadVoices);
     return () => speechSynthesis.removeEventListener('voiceschanged', loadVoices);
-  }, []);
+  }, [selectedVoice]);
 
   const setParagraphs = useCallback((content: string) => {
     const paras = content

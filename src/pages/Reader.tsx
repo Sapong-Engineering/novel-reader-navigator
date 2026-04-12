@@ -8,7 +8,14 @@ import MobileChapterDrawer from '@/components/MobileChapterDrawer';
 import ErrorBoundary from '@/components/ErrorBoundary';
 import ImmersiveOverlay from '@/components/reader/ImmersiveOverlay';
 import { type Novel, type Chapter, saveNovel, getNovel } from '@/lib/novel-store';
-import { syncNovel, syncBookmarksToBackend, syncProgressToBackend, fetchChapterContentFromBackend, syncFullNovelFromBackend } from '@/lib/sync-service';
+import {
+  syncNovel,
+  syncBookmarksToBackend,
+  syncProgressToBackend,
+  fetchChapterContentFromBackend,
+  syncFullNovelFromBackend,
+  mergeBookmarksFromBackend,
+} from '@/lib/sync-service';
 import { exportToPdfWithProgress, exportToDocxWithProgress } from '@/lib/export-service';
 import { useChapterNavigation } from '@/hooks/useChapterNavigation';
 import { useReadingProgress } from '@/hooks/useReadingProgress';
@@ -20,8 +27,9 @@ import { useTTSProgress } from '@/hooks/useTTSProgress';
 import { validateUrl } from '@/lib/validation';
 import { scrapeChapterContent } from '@/lib/api/firecrawl';
 import { orderChapters } from '@/lib/chapter-order';
+import { chapterNeedsRefresh, mergeNovelWithLocalContent } from '@/lib/reader-state';
 import { useAppSettings } from '@/contexts/AppSettingsContext';
-import { startFetchAll, cancelFetchAll, getFetchAllState, subscribeFetchAll, getBackgroundNovel } from '@/lib/background-fetch';
+import { startFetchAll, getFetchAllState, subscribeFetchAll, getBackgroundNovel } from '@/lib/background-fetch';
 import { Button } from '@/components/ui/button';
 import { PanelLeftOpen } from 'lucide-react';
 
@@ -38,6 +46,7 @@ function getInitialDesktopSidebarState() {
 
 const Reader = () => {
   const { novelId } = useParams<{ novelId: string }>();
+  const novelIdStr = novelId ?? '';
   const navigate = useNavigate();
   const [novel, setNovel] = useState<Novel | null>(null);
   const [activeChapter, setActiveChapter] = useState<Chapter | null>(null);
@@ -46,6 +55,8 @@ const Reader = () => {
   const pendingScrollRef = useRef<number | null>(null);
   const forceScrollTopRef = useRef(false);
   const pendingTtsAutoPlayRef = useRef(false);
+  const chapterSelectionRequestRef = useRef(0);
+  const handleSelectChapterRef = useRef<(chapter: Chapter) => Promise<boolean>>(async () => false);
 
   const appSettings = useAppSettings();
   const immersive = useImmersiveMode();
@@ -65,10 +76,23 @@ const Reader = () => {
   const isFetchingAll = fetchState.isFetching && fetchState.progress.novelId === novelId;
   const fetchProgress = fetchState.progress;
 
+  const commitChapterSelection = useCallback((nextChapter: Chapter, previousChapter: Chapter | null) => {
+    if (previousChapter?.id !== nextChapter.id && previousChapter?.content) {
+      const wordCount = previousChapter.content.split(/\s+/).length;
+      recordChapterRead(wordCount);
+    }
+    setActiveChapter(nextChapter);
+    syncProgressToBackend(novelIdStr, nextChapter.id, 0, true);
+  }, [novelIdStr, recordChapterRead]);
+
   const handleNavSelectChapter = useCallback((chapter: Chapter) => {
     forceScrollTopRef.current = true;
-    handleSelectChapter(chapter);
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+    void handleSelectChapterRef.current(chapter).then((didSelect) => {
+      if (!didSelect) {
+        forceScrollTopRef.current = false;
+      }
+    });
+  }, []);
 
   const orderedChapters = useMemo(() => orderChapters(novel?.chapters ?? []), [novel?.chapters]);
 
@@ -98,7 +122,6 @@ const Reader = () => {
     }
   }, [activeChapter?.id, activeChapter?.content]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const novelIdStr = novelId ?? '';
   const { saveProgress, restoreProgress, getLastRead } = useReadingProgress(
     novelIdStr,
     activeChapter?.id,
@@ -123,14 +146,15 @@ const Reader = () => {
     bookmarks,
     addChapterBookmark,
     removeBookmark,
-    isChapterBookmarked,
     getChapterBookmarks,
   } = useBookmarks(novelIdStr);
 
   useEffect(() => {
     try {
       localStorage.setItem(DESKTOP_SIDEBAR_STORAGE_KEY, String(isDesktopSidebarOpen));
-    } catch {}
+    } catch {
+      // Ignore localStorage failures for optional UI state.
+    }
   }, [isDesktopSidebarOpen]);
 
   useEffect(() => {
@@ -154,17 +178,7 @@ const Reader = () => {
     syncFullNovelFromBackend(novelId).then(synced => {
       if (synced) {
         setNovel(prev => {
-          if (!prev) return synced;
-          const localById = new Map(prev.chapters.map(c => [c.id, c]));
-          const merged = synced.chapters.map(sc => {
-            const local = localById.get(sc.id);
-            return local ? { ...sc, content: local.content ?? sc.content } : sc;
-          });
-          const remoteIds = new Set(synced.chapters.map(c => c.id));
-          for (const lc of prev.chapters) {
-            if (!remoteIds.has(lc.id)) merged.push(lc);
-          }
-          const updated = { ...synced, chapters: merged };
+          const updated = mergeNovelWithLocalContent(prev, synced);
           saveNovel(updated);
           return updated;
         });
@@ -172,46 +186,60 @@ const Reader = () => {
     });
   }, [novelId, navigate, appSettings.syncEnabled, getLastRead]);
 
+  useEffect(() => {
+    if (!novelId || !appSettings.syncEnabled) return;
+    void mergeBookmarksFromBackend(novelId);
+  }, [novelId, appSettings.syncEnabled]);
+
+  useEffect(() => {
+    if (!novel || !activeChapter) return;
+
+    const syncedActiveChapter = novel.chapters.find(chapter => chapter.id === activeChapter.id);
+    if (chapterNeedsRefresh(activeChapter, syncedActiveChapter)) {
+      setActiveChapter(syncedActiveChapter);
+    }
+  }, [novel, activeChapter]);
+
   const toggleDesktopSidebar = useCallback(() => {
     setIsDesktopSidebarOpen(prev => !prev);
   }, []);
 
-  async function handleSelectChapter(chapter: Chapter) {
+  const handleSelectChapter = useCallback(async (chapter: Chapter): Promise<boolean> => {
     // Stop TTS when changing chapters
     tts.stop();
+    const requestId = ++chapterSelectionRequestRef.current;
+    const previousChapter = activeChapter;
 
     if (chapter.content) {
-      // Record previous chapter as read
-      if (activeChapter?.content) {
-        const wordCount = activeChapter.content.split(/\s+/).length;
-        recordChapterRead(wordCount);
-      }
-      setActiveChapter(chapter);
-      syncProgressToBackend(novelIdStr, chapter.id, 0, true);
-      return;
+      setIsLoadingChapter(false);
+      commitChapterSelection(chapter, previousChapter);
+      return true;
     }
-    setIsLoadingChapter(true);
-    setActiveChapter(chapter);
 
     const validation = validateUrl(chapter.url);
     if (!validation.valid) {
-      toast.error(`Invalid chapter URL: ${validation.error}`);
       setIsLoadingChapter(false);
-      return;
+      toast.error(`Invalid chapter URL: ${validation.error}`);
+      return false;
     }
+
+    setIsLoadingChapter(true);
 
     try {
       let content = await fetchChapterContentFromBackend(novelIdStr, chapter.id);
       if (!content) {
         if (/gutenberg\.org/i.test(chapter.url)) {
+          if (requestId !== chapterSelectionRequestRef.current) return false;
           toast.error('Chapter content not found. Re-fetch the novel to reload Gutenberg chapters.');
-          setIsLoadingChapter(false);
-          return;
+          return false;
         }
         content = await scrapeChapterContent(chapter.url);
       }
+
+      if (requestId !== chapterSelectionRequestRef.current) return false;
+
       const updated: Chapter = { ...chapter, content, savedAt: new Date().toISOString() };
-      setActiveChapter(updated);
+      commitChapterSelection(updated, previousChapter);
       setNovel(prev => {
         if (!prev) return prev;
         const newNovel = { ...prev, chapters: prev.chapters.map(c => c.id === chapter.id ? updated : c) };
@@ -219,18 +247,23 @@ const Reader = () => {
         syncNovel(newNovel);
         return newNovel;
       });
-      syncProgressToBackend(novelIdStr, chapter.id, 0, true);
+      return true;
     } catch (err) {
+      if (requestId !== chapterSelectionRequestRef.current) return false;
       console.error('Failed to fetch chapter:', err);
       toast.error(
         err instanceof Error
           ? err.message
           : 'Failed to fetch chapter. Please check your connection and try again.',
       );
+      return false;
     } finally {
-      setIsLoadingChapter(false);
+      if (requestId === chapterSelectionRequestRef.current) {
+        setIsLoadingChapter(false);
+      }
     }
-  }
+  }, [activeChapter, commitChapterSelection, novelIdStr, tts]);
+  handleSelectChapterRef.current = handleSelectChapter;
 
   const handleJumpToBookmark = useCallback(
     async (chapterId: string, scrollPosition: number) => {
@@ -238,9 +271,12 @@ const Reader = () => {
       const chapter = novel.chapters.find(c => c.id === chapterId);
       if (!chapter) return;
       pendingScrollRef.current = scrollPosition;
-      await handleSelectChapter(chapter);
+      const didSelect = await handleSelectChapter(chapter);
+      if (!didSelect) {
+        pendingScrollRef.current = null;
+      }
     },
-    [novel], // eslint-disable-line react-hooks/exhaustive-deps
+    [handleSelectChapter, novel],
   );
 
   const handleChapterReady = useCallback(

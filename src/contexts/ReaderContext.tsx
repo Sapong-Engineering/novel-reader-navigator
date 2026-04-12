@@ -1,4 +1,5 @@
-import { createContext, useContext, useState, useEffect, useCallback } from 'react';
+/* eslint-disable react-refresh/only-export-components */
+import { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
 import type { ReactNode } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 
@@ -53,7 +54,10 @@ export function ReaderProvider({ children }: { children: ReactNode }) {
   const [userOverrides, setUserOverrides] = useState<Partial<ReaderSettings>>(loadUserOverrides);
 
   // Effective settings: admin defaults as base, user overrides on top
-  const settings: ReaderSettings = { ...adminDefaults, ...userOverrides };
+  const settings = useMemo<ReaderSettings>(
+    () => ({ ...adminDefaults, ...userOverrides }),
+    [adminDefaults, userOverrides],
+  );
 
   // Fetch admin defaults once on mount — applies to users without explicit preferences
   useEffect(() => {

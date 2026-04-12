@@ -5,6 +5,61 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version',
 };
 
+interface AdminRequestBody {
+  action?: string;
+  userId?: string;
+  disabled?: boolean;
+  novelId?: string;
+  role?: string;
+  key?: string;
+  value?: unknown;
+  ruleId?: string;
+}
+
+interface NovelCountRow {
+  user_id: string;
+}
+
+interface UserRoleRow {
+  user_id: string;
+  role: string;
+}
+
+interface AdminProfileRow {
+  id: string;
+  email: string | null;
+  display_name: string | null;
+  disabled: boolean;
+  created_at: string;
+}
+
+interface AdminNovelRow {
+  id: string;
+  user_id: string;
+  title: string;
+  url: string;
+  cover_url: string | null;
+  created_at: string;
+}
+
+interface ProfileSummaryRow {
+  id: string;
+  email: string | null;
+  display_name: string | null;
+}
+
+interface NovelWithProfileJoin extends AdminNovelRow {
+  profiles?: {
+    email: string | null;
+    display_name: string | null;
+  } | null;
+}
+
+interface AdminSettingRow {
+  key: string;
+  value: unknown;
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -49,7 +104,15 @@ Deno.serve(async (req) => {
       });
     }
 
-    const body = await req.json().catch(() => ({}));
+    let body: AdminRequestBody = {};
+    try {
+      const parsed = await req.json();
+      if (parsed && typeof parsed === 'object') {
+        body = parsed as AdminRequestBody;
+      }
+    } catch {
+      body = {};
+    }
     const { action, ...params } = body;
 
     // Lightweight admin check endpoint — no body needed
@@ -59,7 +122,7 @@ Deno.serve(async (req) => {
       });
     }
 
-    let result: any;
+    let result: unknown;
 
     switch (action) {
       case 'stats': {
@@ -88,19 +151,19 @@ Deno.serve(async (req) => {
           .select('user_id');
 
         const countMap: Record<string, number> = {};
-        (novelCounts || []).forEach((n: any) => {
+        ((novelCounts as NovelCountRow[] | null) || []).forEach((n) => {
           countMap[n.user_id] = (countMap[n.user_id] || 0) + 1;
         });
 
         // Get roles
         const { data: roles } = await adminClient.from('user_roles').select('*');
         const roleMap: Record<string, string[]> = {};
-        (roles || []).forEach((r: any) => {
+        ((roles as UserRoleRow[] | null) || []).forEach((r) => {
           if (!roleMap[r.user_id]) roleMap[r.user_id] = [];
           roleMap[r.user_id].push(r.role);
         });
 
-        result = (profiles || []).map((p: any) => ({
+        result = ((profiles as AdminProfileRow[] | null) || []).map((p) => ({
           ...p,
           novelCount: countMap[p.id] || 0,
           roles: roleMap[p.id] || [],
@@ -127,24 +190,25 @@ Deno.serve(async (req) => {
           .order('created_at', { ascending: false });
 
         // The join may fail if FK doesn't exist, fallback to manual join
-        if (data && data.length > 0 && data[0].profiles) {
-          result = data;
+        const joinedData = data as NovelWithProfileJoin[] | null;
+        if (joinedData && joinedData.length > 0 && joinedData[0].profiles) {
+          result = joinedData;
         } else {
           const { data: novels } = await adminClient
             .from('novels')
             .select('*')
             .order('created_at', { ascending: false });
 
-          const userIds = [...new Set((novels || []).map((n: any) => n.user_id))];
+          const userIds = [...new Set(((novels as AdminNovelRow[] | null) || []).map((n) => n.user_id))];
           const { data: profiles } = await adminClient
             .from('profiles')
             .select('id, email, display_name')
             .in('id', userIds);
 
-          const profileMap: Record<string, any> = {};
-          (profiles || []).forEach((p: any) => { profileMap[p.id] = p; });
+          const profileMap: Record<string, ProfileSummaryRow> = {};
+          ((profiles as ProfileSummaryRow[] | null) || []).forEach((p) => { profileMap[p.id] = p; });
 
-          result = (novels || []).map((n: any) => ({
+          result = ((novels as AdminNovelRow[] | null) || []).map((n) => ({
             ...n,
             owner_email: profileMap[n.user_id]?.email || 'Unknown',
             owner_name: profileMap[n.user_id]?.display_name || null,
@@ -194,8 +258,8 @@ Deno.serve(async (req) => {
         const { data } = await adminClient
           .from('admin_settings')
           .select('key, value');
-        const map: Record<string, any> = {};
-        (data || []).forEach((r: any) => { map[r.key] = r.value; });
+        const map: Record<string, unknown> = {};
+        ((data as AdminSettingRow[] | null) || []).forEach((r) => { map[r.key] = r.value; });
         result = map;
         break;
       }

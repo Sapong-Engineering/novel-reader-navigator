@@ -19,8 +19,8 @@ export class NovelBinAdapter implements SiteAdapter {
     const slug = slugMatch ? slugMatch[1].replace(/\/$/, '') : '';
 
     // Extract title: look for "# [Title](url)" pattern first, then ### heading
-    const linkedTitleMatch = markdown.match(/^#\s+\[([^\]]+)\]/m);
-    const headingMatch = markdown.match(/^###\s+([^\[#\n]+)/m);
+    const linkedTitleMatch = markdown.match(/^#\s+\[([^]]+)\]/m);
+    const headingMatch = markdown.match(/^###\s+([^[#\n]+)/m);
     const title = linkedTitleMatch
       ? linkedTitleMatch[1].trim()
       : headingMatch
@@ -36,7 +36,7 @@ export class NovelBinAdapter implements SiteAdapter {
     const coverUrl = coverMatch ? coverMatch[1] : undefined;
 
     // Extract chapters from markdown links: [Chapter N — Title](url)
-    const chapterRegex = /\[Chapter\s+(\d+)\s*[—–\-:]*\s*(.*?)\]\((https:\/\/novelbin\.[^)]+\/chapter-\d+)\s*(?:"[^"]*")?\)/gi;
+    const chapterRegex = /\[Chapter\s+(\d+)\s*[—–:-]*\s*(.*?)\]\((https:\/\/novelbin\.[^)]+\/chapter-\d+)\s*(?:"[^"]*")?\)/gi;
     const chapters: ChapterInfo[] = [];
     const seenNumbers = new Set<number>();
     let match: RegExpExecArray | null;

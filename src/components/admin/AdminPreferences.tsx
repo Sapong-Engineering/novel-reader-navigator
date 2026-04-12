@@ -14,7 +14,8 @@ import { Badge } from '@/components/ui/badge';
 import { type CleaningRule } from '@/lib/api/admin';
 import AmbientSoundManager from './AmbientSoundManager';
 
-type Settings = Record<string, any>;
+type SettingValue = string | number | boolean | null;
+type Settings = Record<string, SettingValue | undefined>;
 
 const AdminPreferences = () => {
   const [settings, setSettings] = useState<Settings>({});
@@ -36,7 +37,7 @@ const AdminPreferences = () => {
     });
   }, []);
 
-  const updateSetting = useCallback(async (key: string, value: any) => {
+  const updateSetting = useCallback(async (key: string, value: SettingValue) => {
     setSaving(key);
     setSettings(prev => ({ ...prev, [key]: value }));
     try {

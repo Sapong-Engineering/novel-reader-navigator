@@ -6,6 +6,7 @@ import { ChevronLeft, ChevronRight, Bookmark, BookmarkCheck, ArrowUp, ArrowDown,
 import TTSControls from '@/components/reader/TTSControls';
 import type { Chapter } from '@/lib/novel-store';
 import type { Bookmark as BookmarkType } from '@/lib/bookmarks';
+import type { AIVoice, TTSEngine, TTSSpeed } from '@/hooks/useTTS';
 
 interface ReaderViewProps {
   chapter: Chapter | null;
@@ -28,8 +29,8 @@ interface ReaderViewProps {
     isPaused: boolean;
     currentIndex: number;
     totalParagraphs: number;
-    speed: number;
-    setSpeed: (s: any) => void;
+    speed: TTSSpeed;
+    setSpeed: (speed: TTSSpeed) => void;
     voices: SpeechSynthesisVoice[];
     selectedVoice: string;
     setSelectedVoice: (v: string) => void;
@@ -39,9 +40,9 @@ interface ReaderViewProps {
     pause: () => void;
     stop: () => void;
     jumpTo: (index: number) => void;
-    ttsEngine: 'browser' | 'ai';
-    setTtsEngine: (e: 'browser' | 'ai') => void;
-    aiVoices: { id: string; name: string }[];
+    ttsEngine: TTSEngine;
+    setTtsEngine: (engine: TTSEngine) => void;
+    aiVoices: AIVoice[];
     selectedAiVoice: string;
     setSelectedAiVoice: (v: string) => void;
     isAiLoading: boolean;
@@ -318,7 +319,7 @@ const ReaderView = ({
           isPaused={tts.isPaused}
           currentIndex={tts.currentIndex}
           totalParagraphs={tts.totalParagraphs}
-          speed={tts.speed as any}
+          speed={tts.speed}
           onSpeedChange={tts.setSpeed}
           voices={tts.voices}
           selectedVoice={tts.selectedVoice}

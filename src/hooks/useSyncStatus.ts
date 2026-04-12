@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 
 export type SyncState = 'idle' | 'syncing' | 'done' | 'error';
 
-let listeners: Set<(state: SyncState) => void> = new Set();
+const listeners: Set<(state: SyncState) => void> = new Set();
 let currentState: SyncState = 'idle';
 let doneTimer: ReturnType<typeof setTimeout> | null = null;
 

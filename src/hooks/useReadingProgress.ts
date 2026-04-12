@@ -61,7 +61,7 @@ export function useReadingProgress(
         container.scrollTop = scrollTop;
       }
     },
-    [chapterId],
+    [chapterId, getPreferredScrollPosition],
   );
 
   const getLastRead = useCallback(

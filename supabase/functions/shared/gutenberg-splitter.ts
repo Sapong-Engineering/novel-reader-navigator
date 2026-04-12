@@ -71,7 +71,7 @@ export function stripBoilerplate(text: string): string {
 const CHAPTER_PATTERNS: { pattern: RegExp; label: (m: RegExpMatchArray) => string }[] = [
   // "CHAPTER I — Title" or "CHAPTER 1: Title"
   {
-    pattern: /^(?:CHAPTER|Chapter)\s+([IVXLCDM]+|\d+)\s*[.:—–\-]\s*(.+)$/,
+    pattern: /^(?:CHAPTER|Chapter)\s+([IVXLCDM]+|\d+)\s*[.:—–-]\s*(.+)$/,
     label: (m) => `Chapter ${normalizeNum(m[1])}${m[2] ? ' — ' + m[2].trim() : ''}`,
   },
   // "CHAPTER I" or "CHAPTER 1" (no subtitle)

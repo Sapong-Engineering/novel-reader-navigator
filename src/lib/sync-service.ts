@@ -1,10 +1,21 @@
 import { supabase } from '@/integrations/supabase/client';
-import { type Novel, type Chapter, getLibrary, saveNovel, getNovel, deleteNovel as deleteLocalNovel } from './novel-store';
-import { getBookmarks, type Bookmark } from './bookmarks';
+import type { Tables, TablesInsert } from '@/integrations/supabase/types';
+import { type Novel, type Chapter, getLibrary, saveNovel, getNovel } from './novel-store';
+import {
+  getBookmarks,
+  setBookmarks,
+  mergeBookmarkCollections,
+  type Bookmark,
+} from './bookmarks';
 import { setSyncStatus } from '@/hooks/useSyncStatus';
 import { enqueue, dequeue, getQueueLength, onConnectivityChange } from './offline-queue';
 import { compareChapterOrder, orderChapters } from './chapter-order';
 import { isSyncEnabled } from './notify';
+
+type NovelRow = Tables<'novels'>;
+type ChapterRow = Tables<'chapters'>;
+type ChapterMetadataRow = Pick<ChapterRow, 'id' | 'novel_id' | 'local_id' | 'title' | 'url' | 'saved_at' | 'sort_order'>;
+type BookmarkRow = Tables<'bookmarks'>;
 
 // ── Paginated fetch helper (bypasses 1000-row limit) ──
 
@@ -332,6 +343,51 @@ async function getOrCreateNovelId(localId: string, userId: string, novel: Novel)
   return inserted!.id;
 }
 
+async function resolveOrCreateNovelUuid(localId: string, userId: string): Promise<string | null> {
+  const existing = await resolveNovelUuid(localId, userId);
+  if (existing) return existing;
+
+  const novel = getNovel(localId);
+  if (!novel) return null;
+  return getOrCreateNovelId(localId, userId, novel);
+}
+
+function toLocalBookmark(novelLocalId: string, row: BookmarkRow): Bookmark {
+  return {
+    id: row.id,
+    novelId: novelLocalId,
+    chapterId: row.chapter_local_id,
+    chapterTitle: row.chapter_title,
+    scrollPosition: row.scroll_position,
+    label: row.label ?? undefined,
+    createdAt: row.created_at,
+  };
+}
+
+function toRemoteBookmark(bookmark: Bookmark, userId: string, novelUuid: string): TablesInsert<'bookmarks'> {
+  return {
+    user_id: userId,
+    novel_id: novelUuid,
+    chapter_local_id: bookmark.chapterId,
+    chapter_title: bookmark.chapterTitle,
+    scroll_position: bookmark.scrollPosition,
+    label: bookmark.label ?? null,
+    created_at: bookmark.createdAt,
+  };
+}
+
+async function fetchBookmarkRowsFromBackend(novelUuid: string, userId: string): Promise<BookmarkRow[]> {
+  const { data, error } = await supabase
+    .from('bookmarks')
+    .select('*')
+    .eq('novel_id', novelUuid)
+    .eq('user_id', userId)
+    .order('created_at', { ascending: true });
+
+  if (error) throw error;
+  return data ?? [];
+}
+
 // ── Novels ──
 
 export async function syncLibraryFromBackend(): Promise<Novel[]> {
@@ -344,8 +400,15 @@ export async function syncLibraryFromBackend(): Promise<Novel[]> {
     // Fetch novels and chapter METADATA only (skip content for speed)
     // Use paginated fetch to bypass the 1000-row default limit
     const [remoteNovels, remoteChapters] = await Promise.all([
-      fetchAllRows<any>(() => supabase.from('novels').select('*')),
-      fetchAllRows<any>(() => supabase.from('chapters').select('id,novel_id,local_id,title,url,saved_at,sort_order')),
+      fetchAllRows<NovelRow>(() =>
+        supabase.from('novels').select('*').eq('user_id', userId),
+      ),
+      fetchAllRows<ChapterMetadataRow>(() =>
+        supabase
+          .from('chapters')
+          .select('id,novel_id,local_id,title,url,saved_at,sort_order')
+          .eq('user_id', userId),
+      ),
     ]);
 
     // Populate UUID cache
@@ -358,6 +421,7 @@ export async function syncLibraryFromBackend(): Promise<Novel[]> {
       if (local.length > 0) {
         await Promise.all(local.map(novel => upsertNovelToBackend(novel, userId)));
       }
+      setSyncStatus('done');
       return local;
     }
 
@@ -582,6 +646,33 @@ export async function fetchChapterContentFromBackend(
 
 // ── Bookmarks ──
 
+export async function mergeBookmarksFromBackend(novelLocalId: string): Promise<Bookmark[]> {
+  const localBookmarks = getBookmarks(novelLocalId);
+  if (!isSyncEnabled()) return localBookmarks;
+
+  const userId = await getUserId();
+  if (!userId) return localBookmarks;
+
+  try {
+    const novelUuid = await resolveNovelUuid(novelLocalId, userId);
+    if (!novelUuid) return localBookmarks;
+
+    const remoteBookmarks = (await fetchBookmarkRowsFromBackend(novelUuid, userId)).map((bookmark) =>
+      toLocalBookmark(novelLocalId, bookmark),
+    );
+    const mergedBookmarks = mergeBookmarkCollections(localBookmarks, remoteBookmarks);
+
+    if (JSON.stringify(mergedBookmarks) !== JSON.stringify(localBookmarks)) {
+      setBookmarks(novelLocalId, mergedBookmarks);
+    }
+
+    return mergedBookmarks;
+  } catch (err) {
+    console.error('Failed to merge bookmarks from backend:', err);
+    return localBookmarks;
+  }
+}
+
 export async function syncBookmarksToBackend(novelLocalId: string): Promise<void> {
   if (!isSyncEnabled()) return;
   if (!navigator.onLine) {
@@ -591,12 +682,21 @@ export async function syncBookmarksToBackend(novelLocalId: string): Promise<void
   }
   const userId = await getUserId();
   if (!userId) return;
-  setSyncStatus('syncing');
   try {
-    const novelUuid = await resolveNovelUuid(novelLocalId, userId);
+    const novelUuid = await resolveOrCreateNovelUuid(novelLocalId, userId);
     if (!novelUuid) return;
 
+    setSyncStatus('syncing');
+
     const localBookmarks = getBookmarks(novelLocalId);
+    const remoteBookmarks = (await fetchBookmarkRowsFromBackend(novelUuid, userId)).map((bookmark) =>
+      toLocalBookmark(novelLocalId, bookmark),
+    );
+    const mergedBookmarks = mergeBookmarkCollections(localBookmarks, remoteBookmarks);
+
+    if (JSON.stringify(mergedBookmarks) !== JSON.stringify(localBookmarks)) {
+      setBookmarks(novelLocalId, mergedBookmarks);
+    }
 
     await supabase
       .from('bookmarks')
@@ -604,17 +704,10 @@ export async function syncBookmarksToBackend(novelLocalId: string): Promise<void
       .eq('novel_id', novelUuid)
       .eq('user_id', userId);
 
-    if (localBookmarks.length > 0) {
+    if (mergedBookmarks.length > 0) {
       await supabase
         .from('bookmarks')
-        .insert(localBookmarks.map(b => ({
-          user_id: userId,
-          novel_id: novelUuid,
-          chapter_local_id: b.chapterId,
-          chapter_title: b.chapterTitle,
-          scroll_position: b.scrollPosition,
-          label: b.label ?? null,
-        })));
+        .insert(mergedBookmarks.map((bookmark) => toRemoteBookmark(bookmark, userId, novelUuid)));
     }
     setSyncStatus('done');
   } catch (err) {
@@ -660,7 +753,9 @@ export async function syncFullNovelFromBackend(novelLocalId: string): Promise<No
 
     const [novelRes, remoteChapters] = await Promise.all([
       supabase.from('novels').select('*').eq('id', novelUuid).single(),
-      fetchAllRows<any>(() => supabase.from('chapters').select('*').eq('novel_id', novelUuid).order('sort_order')),
+      fetchAllRows<ChapterRow>(() =>
+        supabase.from('chapters').select('*').eq('novel_id', novelUuid).order('sort_order'),
+      ),
     ]);
 
     if (novelRes.error || !novelRes.data) return null;

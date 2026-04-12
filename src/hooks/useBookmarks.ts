@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import {
   getBookmarks,
   addBookmark,
@@ -6,6 +6,7 @@ import {
   isChapterBookmarked,
   getChapterBookmarks,
   findNearbyBookmark,
+  subscribeBookmarks,
   type Bookmark,
 } from '@/lib/bookmarks';
 import type { Chapter } from '@/lib/novel-store';
@@ -20,11 +21,16 @@ export interface UseBookmarksResult {
 }
 
 export function useBookmarks(novelId: string): UseBookmarksResult {
-  const [bookmarks, setBookmarks] = useState<Bookmark[]>(() => getBookmarks(novelId));
+  const [bookmarks, setBookmarksState] = useState<Bookmark[]>(() => getBookmarks(novelId));
 
   const refresh = useCallback(() => {
-    setBookmarks(getBookmarks(novelId));
+    setBookmarksState(getBookmarks(novelId));
   }, [novelId]);
+
+  useEffect(() => {
+    refresh();
+    return subscribeBookmarks(novelId, refresh);
+  }, [novelId, refresh]);
 
   const addChapterBookmark = useCallback(
     (chapter: Chapter, scrollPosition: number, label?: string): Bookmark => {

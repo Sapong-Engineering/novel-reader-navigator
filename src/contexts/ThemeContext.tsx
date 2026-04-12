@@ -1,3 +1,4 @@
+/* eslint-disable react-refresh/only-export-components */
 import { createContext, useContext, useEffect } from 'react';
 import type { ReactNode } from 'react';
 import { ThemeProvider as NextThemesProvider, useTheme } from 'next-themes';

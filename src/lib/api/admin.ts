@@ -1,4 +1,5 @@
 import { supabase } from '@/integrations/supabase/client';
+import type { Json } from '@/integrations/supabase/types';
 
 export interface AdminStats {
   totalUsers: number;
@@ -27,13 +28,13 @@ export interface AdminNovel {
   cover_url: string | null;
 }
 
-async function adminCall(action: string, params: Record<string, any> = {}) {
+async function adminCall<T>(action: string, params: Record<string, Json> = {}): Promise<T> {
   const { data, error } = await supabase.functions.invoke('admin-api', {
     body: { action, ...params },
   });
   if (error) throw new Error(error.message);
   if (data?.error) throw new Error(data.error);
-  return data?.data;
+  return data?.data as T;
 }
 
 export interface CleaningRule {
@@ -54,8 +55,8 @@ export const adminApi = {
   deleteNovel: (novelId: string) => adminCall('delete-novel', { novelId }),
   setRole: (userId: string, role: string) => adminCall('set-role', { userId, role }),
   removeRole: (userId: string, role: string) => adminCall('remove-role', { userId, role }),
-  getSettings: (): Promise<Record<string, any>> => adminCall('get-settings'),
-  updateSetting: (key: string, value: any) => adminCall('update-setting', { key, value }),
+  getSettings: (): Promise<Record<string, Json>> => adminCall('get-settings'),
+  updateSetting: (key: string, value: Json) => adminCall('update-setting', { key, value }),
   listCleaningRules: (): Promise<CleaningRule[]> => adminCall('list-cleaning-rules'),
   deleteCleaningRule: (ruleId: string) => adminCall('delete-cleaning-rule', { ruleId }),
 };

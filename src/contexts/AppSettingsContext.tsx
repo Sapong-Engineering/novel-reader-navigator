@@ -1,3 +1,4 @@
+/* eslint-disable react-refresh/only-export-components */
 import { createContext, useContext, useState, useCallback, useEffect, useRef } from 'react';
 import type { ReactNode } from 'react';
 import { supabase } from '@/integrations/supabase/client';
@@ -75,7 +76,7 @@ export function AppSettingsProvider({ children }: { children: ReactNode }) {
             : {}),
         }));
       });
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => { persist(settings); }, [settings]);
 

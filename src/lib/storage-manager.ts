@@ -220,7 +220,9 @@ export function getTtsProgressEntry(novelId: string, chapterId: string): TtsProg
         updatedAt: typeof parsed.updatedAt === 'string' ? parsed.updatedAt : null,
       };
     }
-  } catch {}
+  } catch {
+    // Fall back to the default empty-progress payload below.
+  }
 
   return { paragraphIndex: 0, updatedAt: null };
 }

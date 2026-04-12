@@ -24,6 +24,7 @@ import AddToListMenu from '@/components/AddToListMenu';
 import { useAppSettings } from '@/contexts/AppSettingsContext';
 import { useReadingLists } from '@/hooks/useReadingLists';
 import { isSyncEnabled } from '@/lib/notify';
+import { supabase } from '@/integrations/supabase/client';
 
 // Lazy-load non-critical toolbar & tab components to reduce initial bundle
 const NovelSearch = lazy(() => import('@/components/NovelSearch'));
@@ -48,10 +49,13 @@ const Index = () => {
   // Check admin role
   useEffect(() => {
     if (!user) { setIsAdmin(false); return; }
-    import('@/integrations/supabase/client').then(({ supabase }) => {
-      supabase.from('user_roles').select('role').eq('user_id', user.id).eq('role', 'admin').maybeSingle()
-        .then(({ data }) => setIsAdmin(!!data));
-    });
+    supabase
+      .from('user_roles')
+      .select('role')
+      .eq('user_id', user.id)
+      .eq('role', 'admin')
+      .maybeSingle()
+      .then(({ data }) => setIsAdmin(!!data));
   }, [user]);
 
   // Track online/offline status

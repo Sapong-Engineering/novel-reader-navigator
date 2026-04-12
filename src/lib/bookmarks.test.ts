@@ -6,6 +6,8 @@ import {
   isChapterBookmarked,
   getChapterBookmarks,
   findNearbyBookmark,
+  setBookmarks,
+  mergeBookmarkCollections,
 } from './bookmarks';
 
 const localStorageMock = (() => {
@@ -38,6 +40,21 @@ describe('bookmarks', () => {
     it('does not return bookmarks from another novel', () => {
       addBookmark({ novelId: 'novel-2', chapterId: 'ch-1', chapterTitle: 'Ch 1', scrollPosition: 0 });
       expect(getBookmarks('novel-1')).toHaveLength(0);
+    });
+
+    it('returns bookmarks replaced via setBookmarks', () => {
+      setBookmarks('novel-1', [{
+        id: 'bookmark-1',
+        novelId: 'novel-1',
+        chapterId: 'ch-3',
+        chapterTitle: 'Chapter 3',
+        scrollPosition: 90,
+        createdAt: '2026-04-12T00:00:00.000Z',
+      }]);
+
+      expect(getBookmarks('novel-1')).toEqual([
+        expect.objectContaining({ id: 'bookmark-1', chapterId: 'ch-3' }),
+      ]);
     });
   });
 
@@ -134,6 +151,56 @@ describe('bookmarks', () => {
     it('finds exact match', () => {
       const bm = addBookmark({ novelId: 'n1', chapterId: 'ch-1', chapterTitle: 'Ch 1', scrollPosition: 250 });
       expect(findNearbyBookmark('n1', 'ch-1', 250)?.id).toBe(bm.id);
+    });
+  });
+
+  describe('mergeBookmarkCollections', () => {
+    it('keeps unique remote bookmarks when merging devices', () => {
+      const merged = mergeBookmarkCollections(
+        [{
+          id: 'local-1',
+          novelId: 'novel-1',
+          chapterId: 'ch-1',
+          chapterTitle: 'Chapter 1',
+          scrollPosition: 100,
+          createdAt: '2026-04-12T00:00:00.000Z',
+        }],
+        [{
+          id: 'remote-1',
+          novelId: 'novel-1',
+          chapterId: 'ch-2',
+          chapterTitle: 'Chapter 2',
+          scrollPosition: 250,
+          createdAt: '2026-04-12T01:00:00.000Z',
+        }],
+      );
+
+      expect(merged.map((bookmark) => bookmark.chapterId)).toEqual(['ch-1', 'ch-2']);
+    });
+
+    it('does not duplicate bookmarks already present locally', () => {
+      const merged = mergeBookmarkCollections(
+        [{
+          id: 'local-1',
+          novelId: 'novel-1',
+          chapterId: 'ch-1',
+          chapterTitle: 'Chapter 1',
+          scrollPosition: 100,
+          label: 'favorite spot',
+          createdAt: '2026-04-12T00:00:00.000Z',
+        }],
+        [{
+          id: 'remote-1',
+          novelId: 'novel-1',
+          chapterId: 'ch-1',
+          chapterTitle: 'Chapter 1',
+          scrollPosition: 100,
+          label: 'favorite spot',
+          createdAt: '2026-04-12T00:00:00.000Z',
+        }],
+      );
+
+      expect(merged).toHaveLength(1);
     });
   });
 });

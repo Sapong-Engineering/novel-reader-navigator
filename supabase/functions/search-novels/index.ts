@@ -12,6 +12,30 @@ const ADAPTER_SITE_MAP: Record<string, string> = {
   adapter_gutenberg: 'gutenberg.org',
 };
 
+interface AdminSettingRow {
+  key: string;
+  value: boolean;
+}
+
+interface FirecrawlSearchResult {
+  url?: string;
+  title?: string;
+  description?: string;
+}
+
+interface FirecrawlSearchResponse {
+  error?: string;
+  data?: FirecrawlSearchResult[];
+}
+
+interface NovelSearchResult {
+  title: string;
+  url: string;
+  description: string;
+  source: string;
+  author?: string;
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -72,7 +96,9 @@ Deno.serve(async (req) => {
       .in('key', adapterKeys);
 
     const settingsMap: Record<string, boolean> = {};
-    (settings || []).forEach((s: any) => { settingsMap[s.key] = s.value; });
+    ((settings as AdminSettingRow[] | null) || []).forEach((setting) => {
+      settingsMap[setting.key] = setting.value;
+    });
 
     // Build enabled sites list (default to enabled if no setting exists)
     const enabledSites = adapterKeys
@@ -99,7 +125,7 @@ Deno.serve(async (req) => {
       body: JSON.stringify({ query: searchQuery, limit: 20 }),
     });
 
-    const data = await response.json();
+    const data: FirecrawlSearchResponse = await response.json();
 
     if (!response.ok) {
       console.error('Firecrawl search error:', data);
@@ -112,7 +138,7 @@ Deno.serve(async (req) => {
     const enabledSitesSet = new Set(enabledSites);
 
     const results = (data.data || [])
-      .map((item: any) => {
+      .map((item): NovelSearchResult | null => {
         const url = item.url || '';
         let source = 'unknown';
         let domain = '';
@@ -155,9 +181,10 @@ Deno.serve(async (req) => {
       .filter(Boolean);
 
     const seen = new Set<string>();
-    const unique = results.filter((r: any) => {
-      if (seen.has(r.url)) return false;
-      seen.add(r.url);
+    const unique = results.filter((result): result is NovelSearchResult => {
+      if (!result) return false;
+      if (seen.has(result.url)) return false;
+      seen.add(result.url);
       return true;
     });
 
