@@ -4,6 +4,7 @@ import { toast } from 'sonner';
 import { Loader2, Trash2, Search, ExternalLink } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import NovelCover from '@/components/NovelCover';
 import {
   Table,
   TableBody,
@@ -84,9 +85,14 @@ const ContentModeration = () => {
               <TableRow key={n.id}>
                 <TableCell>
                   <div className="flex items-center gap-2">
-                    {n.cover_url && (
-                      <img src={n.cover_url} alt="" className="w-8 h-10 object-cover rounded" />
-                    )}
+                    <NovelCover
+                      coverUrl={n.cover_url}
+                      title={n.title}
+                      alt=""
+                      className="w-8 h-10 rounded"
+                      imageClassName="object-cover"
+                      iconClassName="w-4 h-4"
+                    />
                     <span className="font-sans-ui text-sm font-medium text-foreground truncate max-w-[200px]">
                       {n.title}
                     </span>
