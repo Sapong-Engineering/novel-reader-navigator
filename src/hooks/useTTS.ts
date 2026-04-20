@@ -42,6 +42,7 @@ export function useTTS(onChapterEnd?: () => void) {
   const [isPlaying, setIsPlaying] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
   const [currentIndex, setCurrentIndex] = useState(0);
+  const [totalParagraphs, setTotalParagraphs] = useState(0);
   const [speed, setSpeed] = useState<TTSSpeed>(1);
   const [voices, setVoices] = useState<SpeechSynthesisVoice[]>([]);
   const [selectedVoice, setSelectedVoice] = useState<string>('');
@@ -130,16 +131,21 @@ export function useTTS(onChapterEnd?: () => void) {
     return () => speechSynthesis.removeEventListener('voiceschanged', loadVoices);
   }, [selectedVoice]);
 
-  const setParagraphs = useCallback((content: string) => {
-    const paras = content
-      .split('\n\n')
+  const setParagraphList = useCallback((paragraphs: string[], startIndex = 0) => {
+    const paras = paragraphs
       .map(p => p.trim())
       .filter(p => p.length > 0);
+    const safeIndex = paras.length > 0 ? Math.min(Math.max(startIndex, 0), paras.length - 1) : 0;
     paragraphsRef.current = paras;
-    setCurrentIndex(0);
-    currentIndexRef.current = 0;
+    setTotalParagraphs(paras.length);
+    setCurrentIndex(safeIndex);
+    currentIndexRef.current = safeIndex;
     prefetchRef.current = null;
   }, []);
+
+  const setParagraphs = useCallback((content: string) => {
+    setParagraphList(content.split('\n\n'));
+  }, [setParagraphList]);
 
   // --- AI TTS helpers ---
   const fetchAiAudio = useCallback(async (text: string): Promise<Blob> => {
@@ -426,7 +432,7 @@ export function useTTS(onChapterEnd?: () => void) {
     isPlaying,
     isPaused,
     currentIndex,
-    totalParagraphs: paragraphsRef.current.length,
+    totalParagraphs,
     speed,
     setSpeed,
     voices,
@@ -435,6 +441,7 @@ export function useTTS(onChapterEnd?: () => void) {
     autoAdvance,
     setAutoAdvance,
     setParagraphs,
+    setParagraphList,
     play,
     pause,
     stop,

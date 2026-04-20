@@ -5,8 +5,12 @@ import { saveNovel, type Novel } from '@/lib/novel-store';
 import { getPdfDocument } from '@/lib/pdf-store';
 import { getPdfReadingProgress, savePdfReadingProgress } from '@/lib/pdf-progress';
 import { loadPdfDocumentFromBlob } from '@/lib/pdfjs';
+import { usePdfAudio } from '@/hooks/usePdfAudio';
+import { usePdfText } from '@/hooks/usePdfText';
 import PdfPage from '@/components/pdf/PdfPage';
+import PdfAudioControls from '@/components/pdf/PdfAudioControls';
 import type { PDFDocumentProxy } from 'pdfjs-dist/types/src/display/api';
+import type { PdfAudioSegment } from '@/lib/pdf-text';
 
 interface PdfReaderViewProps {
   novel: Novel;
@@ -134,6 +138,37 @@ const PdfReaderView = ({ novel, onBack }: PdfReaderViewProps) => {
     };
   }, [novel.id, pdf, scrollRoot]);
 
+  const pdfText = usePdfText(novel.id, pdf, currentPage);
+
+  const scrollToSegment = useCallback((segment: PdfAudioSegment) => {
+    const container = scrollRoot;
+    if (!container) return;
+
+    const pageNode = container.querySelector<HTMLElement>(`[data-pdf-page="${segment.pageNumber}"]`);
+    if (!pageNode) return;
+
+    const shell = pageNode.querySelector<HTMLElement>('[data-pdf-canvas-shell]');
+    const firstBox = segment.boxes[0];
+    const boxOffset = shell && firstBox ? (firstBox.y / 100) * shell.offsetHeight : 0;
+    const shellOffset = shell ? shell.offsetTop : 0;
+    const targetTop = pageNode.offsetTop + shellOffset + boxOffset - container.clientHeight * 0.35;
+
+    container.scrollTo({
+      top: Math.max(targetTop, 0),
+      behavior: 'smooth',
+    });
+  }, [scrollRoot]);
+
+  const pdfAudio = usePdfAudio({
+    novelId: novel.id,
+    pageCount: pageCount || pdf?.numPages || 1,
+    visiblePage: currentPage,
+    getSegmentsForPage: pdfText.getSegmentsForPage,
+    isPageLoading: pdfText.isPageLoading,
+    ensurePageText: pdfText.ensurePageText,
+    scrollToSegment,
+  });
+
   const subtitle = useMemo(() => {
     if (pageCount > 0) {
       return `${pageCount} ${pageCount === 1 ? 'page' : 'pages'} local PDF`;
@@ -200,10 +235,38 @@ const PdfReaderView = ({ novel, onBack }: PdfReaderViewProps) => {
               pageNumber={index + 1}
               containerWidth={containerWidth}
               scrollRoot={scrollRoot}
+              activeSegment={pdfAudio.isPlaying || pdfAudio.isPaused ? pdfAudio.activeSegment : null}
             />
           ))}
         </div>
       </div>
+
+      <PdfAudioControls
+        isPlaying={pdfAudio.isPlaying}
+        isPaused={pdfAudio.isPaused}
+        currentIndex={pdfAudio.currentIndex}
+        totalParagraphs={pdfAudio.totalParagraphs}
+        audioPageNumber={pdfAudio.audioPageNumber}
+        isAudioTextLoading={pdfAudio.isAudioTextLoading}
+        hasAudioText={pdfAudio.hasAudioText}
+        speed={pdfAudio.speed}
+        onSpeedChange={pdfAudio.setSpeed}
+        voices={pdfAudio.voices}
+        selectedVoice={pdfAudio.selectedVoice}
+        onVoiceChange={pdfAudio.setSelectedVoice}
+        autoAdvance={pdfAudio.autoAdvance}
+        onAutoAdvanceChange={pdfAudio.setAutoAdvance}
+        onPlay={pdfAudio.play}
+        onPause={pdfAudio.pause}
+        onStop={pdfAudio.stop}
+        onJumpTo={pdfAudio.jumpTo}
+        ttsEngine={pdfAudio.ttsEngine}
+        onEngineChange={pdfAudio.setTtsEngine}
+        aiVoices={pdfAudio.aiVoices}
+        selectedAiVoice={pdfAudio.selectedAiVoice}
+        onAiVoiceChange={pdfAudio.setSelectedAiVoice}
+        isAiLoading={pdfAudio.isAiLoading}
+      />
     </div>
   );
 };

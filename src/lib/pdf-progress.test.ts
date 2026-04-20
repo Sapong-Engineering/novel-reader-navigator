@@ -10,6 +10,7 @@ describe('pdf progress', () => {
     expect(getPdfReadingProgress('novel-1')).toEqual({
       pageNumber: 1,
       scrollTop: 0,
+      audioSegmentIndex: 0,
       updatedAt: null,
     });
   });
@@ -20,6 +21,16 @@ describe('pdf progress', () => {
 
     expect(restored.pageNumber).toBe(7);
     expect(restored.scrollTop).toBe(1280);
+    expect(restored.audioSegmentIndex).toBe(0);
     expect(restored.updatedAt).toEqual(expect.any(String));
+  });
+
+  it('preserves audio progress when scroll progress is updated', () => {
+    savePdfReadingProgress('novel-1', 3, 500, 4);
+    savePdfReadingProgress('novel-1', 3, 750);
+
+    const restored = getPdfReadingProgress('novel-1');
+    expect(restored.scrollTop).toBe(750);
+    expect(restored.audioSegmentIndex).toBe(4);
   });
 });

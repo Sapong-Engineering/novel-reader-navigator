@@ -1,17 +1,19 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { PDFDocumentProxy, RenderTask } from 'pdfjs-dist/types/src/display/api';
 import { Loader2 } from 'lucide-react';
+import type { PdfAudioSegment } from '@/lib/pdf-text';
 
 interface PdfPageProps {
   pdf: PDFDocumentProxy;
   pageNumber: number;
   containerWidth: number;
   scrollRoot: HTMLElement | null;
+  activeSegment?: PdfAudioSegment | null;
 }
 
 const PREVIEW_ASPECT_RATIO = 1.35;
 
-const PdfPage = ({ pdf, pageNumber, containerWidth, scrollRoot }: PdfPageProps) => {
+const PdfPage = ({ pdf, pageNumber, containerWidth, scrollRoot, activeSegment }: PdfPageProps) => {
   const wrapperRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [isNearViewport, setIsNearViewport] = useState(pageNumber <= 2);
@@ -116,11 +118,27 @@ const PdfPage = ({ pdf, pageNumber, containerWidth, scrollRoot }: PdfPageProps) 
             <p className="font-sans-ui text-sm text-destructive">{error}</p>
           </div>
         ) : (
-          <div className="relative">
+          <div className="relative" data-pdf-canvas-shell>
             <canvas
               ref={canvasRef}
               className={`max-w-full rounded-lg bg-white shadow-sm ${isRendering ? 'opacity-60' : 'opacity-100'} transition-opacity`}
             />
+            {activeSegment?.pageNumber === pageNumber && (
+              <div className="pointer-events-none absolute inset-0 rounded-lg overflow-hidden">
+                {activeSegment.boxes.map((box, index) => (
+                  <div
+                    key={`${activeSegment.id}-${index}`}
+                    className="absolute rounded-sm bg-primary/20 ring-1 ring-primary/35 transition-all"
+                    style={{
+                      left: `${box.x}%`,
+                      top: `${box.y}%`,
+                      width: `${box.width}%`,
+                      height: `${box.height}%`,
+                    }}
+                  />
+                ))}
+              </div>
+            )}
             {isRendering && (
               <div className="absolute inset-0 flex items-center justify-center bg-background/30 rounded-lg">
                 <Loader2 className="w-5 h-5 animate-spin text-primary" />
