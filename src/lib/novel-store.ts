@@ -28,6 +28,8 @@ export interface Novel {
   sourceFileSize?: number;
   pageCount?: number;
   storageKey?: string;
+  storageBucket?: string;
+  storagePath?: string;
   isLocalOnly?: boolean;
 }
 

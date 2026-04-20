@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Trash2, BookOpen, FileText } from 'lucide-react';
+import { Trash2, BookOpen, FileText, Cloud, CloudOff, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   AlertDialog,
@@ -21,16 +21,19 @@ interface NovelCardProps {
   novel: Novel;
   onOpen: (novel: Novel) => void;
   onDelete: (id: string) => void;
+  onRetryUpload?: (id: string) => void;
   lists?: ReadingList[];
   selectedListIds?: string[];
   onToggleList?: (listId: string, checked: boolean) => void;
 }
 
-const NovelCard = ({ novel, onOpen, onDelete, lists = [], selectedListIds = [], onToggleList }: NovelCardProps) => {
+const NovelCard = ({ novel, onOpen, onDelete, onRetryUpload, lists = [], selectedListIds = [], onToggleList }: NovelCardProps) => {
   const [dialogOpen, setDialogOpen] = useState(false);
   const savedCount = novel.chapters.filter(c => c.content).length;
   const savedDate = new Date(novel.savedAt).toLocaleDateString();
   const isPdf = novel.sourceType === 'pdf';
+  const isCloudSynced = isPdf && !novel.isLocalOnly && !!novel.storagePath;
+  const isPdfLocalOnly = isPdf && !!novel.isLocalOnly;
   const subtitle = isPdf
     ? `${novel.pageCount ? `${novel.pageCount} pages` : 'PDF document'} · ${savedDate}`
     : `${savedCount}/${novel.chapters.length} chapters · ${savedDate}`;
@@ -64,7 +67,24 @@ const NovelCard = ({ novel, onOpen, onDelete, lists = [], selectedListIds = [], 
           <h3 className="font-sans-ui font-semibold text-sm truncate text-foreground flex-1">
             {novel.title}
           </h3>
-          {isPdf && (
+          {isCloudSynced && (
+            <span className="inline-flex items-center gap-1 rounded-full bg-green-100 dark:bg-green-900/30 px-2 py-0.5 text-[10px] font-sans-ui font-medium text-green-700 dark:text-green-400">
+              <Cloud className="w-3 h-3" aria-hidden="true" />
+              Synced
+            </span>
+          )}
+          {isPdfLocalOnly && (
+            <span
+              title="Local only — not backed up to cloud"
+              className="inline-flex items-center gap-1 rounded-full bg-amber-100 dark:bg-amber-900/30 px-2 py-0.5 text-[10px] font-sans-ui font-medium text-amber-700 dark:text-amber-400 cursor-pointer hover:bg-amber-200 dark:hover:bg-amber-900/50 transition-colors"
+              onClick={(e) => { e.stopPropagation(); onRetryUpload?.(novel.id); }}
+            >
+              <CloudOff className="w-3 h-3" aria-hidden="true" />
+              Local only
+              {onRetryUpload && <RefreshCw className="w-3 h-3 ml-0.5" aria-hidden="true" />}
+            </span>
+          )}
+          {!isCloudSynced && !isPdfLocalOnly && isPdf && (
             <span className="inline-flex items-center gap-1 rounded-full bg-secondary px-2 py-0.5 text-[10px] font-sans-ui font-medium uppercase tracking-wide text-muted-foreground">
               <FileText className="w-3 h-3" aria-hidden="true" />
               PDF

@@ -224,7 +224,7 @@ Deno.serve(async (req) => {
 
         const { data: novel, error: novelLookupError } = await adminClient
           .from('novels')
-          .select('id,user_id,local_id,title,url')
+          .select('id,user_id,local_id,title,url,storage_bucket,storage_path')
           .eq('id', novelId)
           .maybeSingle();
         if (novelLookupError) throw novelLookupError;
@@ -254,6 +254,16 @@ Deno.serve(async (req) => {
           .eq('user_id', novel.user_id)
           .eq('novel_local_id', novel.local_id);
         if (listItemError) throw listItemError;
+
+        // Delete PDF from Supabase Storage if applicable (non-fatal)
+        if (novel.storage_bucket && novel.storage_path) {
+          const { error: storageError } = await adminClient.storage
+            .from(novel.storage_bucket)
+            .remove([novel.storage_path]);
+          if (storageError) {
+            console.error('Admin: failed to delete PDF from storage (non-fatal):', storageError);
+          }
+        }
 
         // Delete chapters first, then novel. Tombstone above prevents stale devices
         // from treating the missing row as a local-only novel to re-upload.

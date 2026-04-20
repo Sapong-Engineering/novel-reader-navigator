@@ -3,6 +3,7 @@ import { FileText, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { saveNovel, type Novel } from '@/lib/novel-store';
 import { getPdfDocument } from '@/lib/pdf-store';
+import { getSignedPdfDownloadUrl, fetchPdfBlobFromCloud } from '@/lib/pdf-cloud-store';
 import { getPdfReadingProgress, savePdfReadingProgress } from '@/lib/pdf-progress';
 import { loadPdfDocumentFromBlob } from '@/lib/pdfjs';
 import { usePdfAudio } from '@/hooks/usePdfAudio';
@@ -22,6 +23,7 @@ const PdfReaderView = ({ novel, onBack }: PdfReaderViewProps) => {
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [pdf, setPdf] = useState<PDFDocumentProxy | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [loadingMessage, setLoadingMessage] = useState('Opening PDF…');
   const [error, setError] = useState<string | null>(null);
   const [containerWidth, setContainerWidth] = useState(0);
   const [scrollRoot, setScrollRoot] = useState<HTMLDivElement | null>(null);
@@ -38,13 +40,40 @@ const PdfReaderView = ({ novel, onBack }: PdfReaderViewProps) => {
     let loadedPdf: PDFDocumentProxy | null = null;
 
     void getPdfDocument(novel.id)
-      .then((document) => {
-        if (!active) return;
-        if (!document) {
-          setError('This PDF could not be found in local storage.');
-          return;
+      .then(async (document) => {
+        if (!active) return undefined;
+
+        if (document) {
+          return loadPdfDocumentFromBlob(document.blob);
         }
-        return loadPdfDocumentFromBlob(document.blob);
+
+        // Not cached locally — try downloading from cloud
+        if (novel.storagePath && novel.storageBucket) {
+          if (!navigator.onLine) {
+            setError("You're offline and this PDF hasn't been downloaded yet.");
+            return undefined;
+          }
+          setLoadingMessage('Downloading PDF from cloud…');
+          const signedUrl = await getSignedPdfDownloadUrl(novel.storageBucket, novel.storagePath);
+          await fetchPdfBlobFromCloud(
+            signedUrl,
+            novel.id,
+            novel.sourceFileName ?? `${novel.id}.pdf`,
+            'application/pdf',
+            novel.sourceFileSize ?? 0,
+            novel.savedAt,
+          );
+          const downloaded = await getPdfDocument(novel.id);
+          if (!active) return undefined;
+          if (!downloaded) {
+            setError('Download succeeded but PDF could not be loaded.');
+            return undefined;
+          }
+          return loadPdfDocumentFromBlob(downloaded.blob);
+        }
+
+        setError('This PDF is not available on this device. Import it again to read it.');
+        return undefined;
       })
       .then((loadedDocument) => {
         if (!active || !loadedDocument) return;
@@ -183,7 +212,7 @@ const PdfReaderView = ({ novel, onBack }: PdfReaderViewProps) => {
       <div className="min-h-screen bg-background flex items-center justify-center px-4">
         <div className="text-center">
           <Loader2 className="w-8 h-8 animate-spin text-primary mx-auto mb-4" />
-          <p className="font-sans-ui text-sm text-muted-foreground">Opening PDF…</p>
+          <p className="font-sans-ui text-sm text-muted-foreground">{loadingMessage}</p>
         </div>
       </div>
     );

@@ -1,8 +1,10 @@
 import { generateId, type Novel } from '@/lib/novel-store';
 import { savePdfDocument } from '@/lib/pdf-store';
+import { uploadPdfToCloud, savePdfNovelMetadataToBackend } from '@/lib/pdf-cloud-store';
+import { enqueue } from '@/lib/offline-queue';
 
 export interface PdfImportProgress {
-  stage: 'validating' | 'saving';
+  stage: 'validating' | 'saving' | 'uploading' | 'done';
   current: number;
   total: number;
   message: string;
@@ -10,6 +12,7 @@ export interface PdfImportProgress {
 
 export interface PdfImportResult {
   novel: Novel;
+  uploadedToCloud: boolean;
 }
 
 const MAX_PDF_SIZE_BYTES = 50 * 1024 * 1024;
@@ -46,24 +49,26 @@ async function assertValidPdfFile(file: File): Promise<void> {
 
 export async function importPdfFile(
   file: File,
+  userId: string | null,
   onProgress?: (progress: PdfImportProgress) => void,
 ): Promise<PdfImportResult> {
   onProgress?.({
     stage: 'validating',
     current: 1,
-    total: 2,
+    total: 4,
     message: 'Validating PDF…',
   });
 
   await assertValidPdfFile(file);
 
   const novelId = generateId();
+  const savedAt = new Date().toISOString();
   const novel: Novel = {
     id: novelId,
     title: normalizePdfTitle(file.name),
     url: `pdf://${novelId}`,
     chapters: [],
-    savedAt: new Date().toISOString(),
+    savedAt,
     sourceType: 'pdf',
     readerMode: 'pdf',
     sourceFileName: file.name,
@@ -75,7 +80,7 @@ export async function importPdfFile(
   onProgress?.({
     stage: 'saving',
     current: 2,
-    total: 2,
+    total: 4,
     message: 'Saving PDF locally…',
   });
 
@@ -85,8 +90,57 @@ export async function importPdfFile(
     mimeType: file.type || 'application/pdf',
     size: file.size,
     blob: file,
-    createdAt: novel.savedAt,
+    createdAt: savedAt,
   });
 
-  return { novel };
+  // Try cloud upload if logged in and online
+  if (userId && navigator.onLine) {
+    onProgress?.({
+      stage: 'uploading',
+      current: 3,
+      total: 4,
+      message: 'Uploading to cloud…',
+    });
+
+    try {
+      const location = await uploadPdfToCloud(novelId, userId, file, (uploadProgress) => {
+        onProgress?.({
+          stage: 'uploading',
+          current: 3,
+          total: 4,
+          message: `Uploading… ${uploadProgress.percent}%`,
+        });
+      });
+
+      await savePdfNovelMetadataToBackend(novel, userId, location);
+
+      novel.isLocalOnly = false;
+      novel.storageBucket = location.bucket;
+      novel.storagePath = location.path;
+
+      onProgress?.({
+        stage: 'done',
+        current: 4,
+        total: 4,
+        message: 'Done.',
+      });
+
+      return { novel, uploadedToCloud: true };
+    } catch {
+      // Upload failed — keep local-only and enqueue for retry
+      enqueue('uploadPdf', { novelId });
+    }
+  } else if (userId && !navigator.onLine) {
+    // Logged in but offline — enqueue for retry when online
+    enqueue('uploadPdf', { novelId });
+  }
+
+  onProgress?.({
+    stage: 'done',
+    current: 4,
+    total: 4,
+    message: 'Saved locally.',
+  });
+
+  return { novel, uploadedToCloud: false };
 }

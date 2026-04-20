@@ -5,7 +5,7 @@
 
 export interface QueuedOperation {
   id: string;
-  type: 'syncNovel' | 'deleteNovel' | 'syncBookmarks' | 'syncProgress';
+  type: 'syncNovel' | 'deleteNovel' | 'syncBookmarks' | 'syncProgress' | 'uploadPdf' | 'deletePdfCloud';
   payload: Record<string, unknown>;
   createdAt: string;
 }
@@ -62,6 +62,10 @@ function dedupeKey(type: string, payload: Record<string, unknown>): string {
       return `syncBookmarks:${payload.novelLocalId}`;
     case 'syncProgress':
       return `syncProgress:${payload.novelLocalId}:${payload.chapterLocalId}`;
+    case 'uploadPdf':
+      return `uploadPdf:${payload.novelId}`;
+    case 'deletePdfCloud':
+      return `deletePdfCloud:${payload.bucket}:${payload.path}`;
     default:
       return `${type}:${JSON.stringify(payload)}`;
   }

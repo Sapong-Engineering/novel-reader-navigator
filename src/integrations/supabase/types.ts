@@ -168,7 +168,14 @@ export type Database = {
           description: string | null
           id: string
           local_id: string
+          page_count: number | null
+          reader_mode: string
           saved_at: string
+          source_file_name: string | null
+          source_file_size: number | null
+          source_type: string
+          storage_bucket: string | null
+          storage_path: string | null
           title: string
           updated_at: string
           url: string
@@ -180,7 +187,14 @@ export type Database = {
           description?: string | null
           id?: string
           local_id: string
+          page_count?: number | null
+          reader_mode?: string
           saved_at?: string
+          source_file_name?: string | null
+          source_file_size?: number | null
+          source_type?: string
+          storage_bucket?: string | null
+          storage_path?: string | null
           title: string
           updated_at?: string
           url: string
@@ -192,7 +206,14 @@ export type Database = {
           description?: string | null
           id?: string
           local_id?: string
+          page_count?: number | null
+          reader_mode?: string
           saved_at?: string
+          source_file_name?: string | null
+          source_file_size?: number | null
+          source_type?: string
+          storage_bucket?: string | null
+          storage_path?: string | null
           title?: string
           updated_at?: string
           url?: string

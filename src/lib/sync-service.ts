@@ -1,6 +1,8 @@
 import { supabase } from '@/integrations/supabase/client';
 import type { Tables, TablesInsert } from '@/integrations/supabase/types';
 import { type Novel, type Chapter, getLibrary, saveLibrary, saveNovel, getNovel } from './novel-store';
+import { uploadPdfToCloud, savePdfNovelMetadataToBackend, deletePdfFromCloud } from './pdf-cloud-store';
+import { getPdfDocument } from './pdf-store';
 import {
   getBookmarks,
   setBookmarks,
@@ -534,7 +536,6 @@ export async function syncLibraryFromBackend(): Promise<Novel[]> {
 
     if (!remoteNovels.length) {
       const uploadableLocal = localLibrary.filter(novel =>
-        novel.sourceType !== 'pdf' &&
         !novel.isLocalOnly &&
         !isNovelDeletedBy(novel, deletionIndex),
       );
@@ -595,6 +596,14 @@ export async function syncLibraryFromBackend(): Promise<Novel[]> {
         description: rn.description ?? undefined,
         savedAt: rn.saved_at,
         chapters: mergeChapters(localNovel?.chapters ?? [], chapters),
+        sourceType: (rn.source_type as 'web' | 'pdf') ?? 'web',
+        readerMode: (rn.reader_mode as 'text' | 'pdf') ?? 'text',
+        storageBucket: rn.storage_bucket ?? undefined,
+        storagePath: rn.storage_path ?? undefined,
+        sourceFileName: rn.source_file_name ?? undefined,
+        sourceFileSize: rn.source_file_size ?? undefined,
+        pageCount: rn.page_count ?? undefined,
+        isLocalOnly: false,
       };
       saveNovel(novel);
       mergedNovels.push(novel);
@@ -602,8 +611,15 @@ export async function syncLibraryFromBackend(): Promise<Novel[]> {
 
     // Push local-only novels to backend
     const seenUrls = new Set(mergedNovels.map(n => n.url));
+    // Only truly local-only items (not yet uploaded) are preserved without backend push.
+    // Cloud-synced PDFs (isLocalOnly: false) are already in mergedNovels via remoteNovels.
+    const locallyPreserved = localLibrary.filter(n =>
+      n.isLocalOnly === true &&
+      !seenLocalIds.has(n.id) &&
+      !seenUrls.has(n.url) &&
+      !isNovelDeletedBy(n, deletionIndex),
+    );
     const localOnly = localLibrary.filter(n =>
-      n.sourceType !== 'pdf' &&
       !n.isLocalOnly &&
       !seenLocalIds.has(n.id) &&
       !seenUrls.has(n.url) &&
@@ -613,6 +629,7 @@ export async function syncLibraryFromBackend(): Promise<Novel[]> {
       await Promise.all(localOnly.map(novel => upsertNovelToBackend(novel, userId)));
       mergedNovels.push(...localOnly);
     }
+    mergedNovels.push(...locallyPreserved);
 
     // Deduplicate by URL
     const urlMap = new Map<string, Novel>();
@@ -669,21 +686,40 @@ function mergeChapters(local: Chapter[], remote: Chapter[]): Chapter[] {
 }
 
 async function upsertNovelToBackend(novel: Novel, userId: string): Promise<void> {
-  if (novel.sourceType === 'pdf' || novel.isLocalOnly || isNovelDeletedLocally(novel)) return;
+  // Local-only novels (not yet uploaded) must not be synced
+  if (novel.isLocalOnly || isNovelDeletedLocally(novel)) return;
   const novelUuid = await getOrCreateNovelId(novel.id, userId, novel);
 
-  // Update metadata
+  // Base metadata fields
+  const metaFields: Record<string, unknown> = {
+    title: novel.title,
+    url: novel.url,
+    cover_url: novel.coverUrl ?? null,
+    description: novel.description ?? null,
+    saved_at: novel.savedAt,
+    updated_at: new Date().toISOString(),
+  };
+
+  // Include PDF-specific columns when applicable
+  if (novel.sourceType === 'pdf') {
+    metaFields.source_type = 'pdf';
+    metaFields.reader_mode = 'pdf';
+    metaFields.storage_bucket = novel.storageBucket ?? null;
+    metaFields.storage_path = novel.storagePath ?? null;
+    metaFields.source_file_name = novel.sourceFileName ?? null;
+    metaFields.source_file_size = novel.sourceFileSize ?? null;
+    metaFields.page_count = novel.pageCount ?? null;
+  }
+
   const metaPromise = supabase
     .from('novels')
-    .update({
-      title: novel.title,
-      url: novel.url,
-      cover_url: novel.coverUrl ?? null,
-      description: novel.description ?? null,
-      saved_at: novel.savedAt,
-      updated_at: new Date().toISOString(),
-    })
+    .update(metaFields)
     .eq('id', novelUuid);
+
+  await metaPromise;
+
+  // PDF novels have no chapters to sync
+  if (novel.sourceType === 'pdf') return;
 
   // Batch upsert ALL chapters in chunks of 500 to avoid hitting Supabase limits
   const orderedChapters = orderChapters(novel.chapters);
@@ -698,8 +734,6 @@ async function upsertNovelToBackend(novel: Novel, userId: string): Promise<void>
     sort_order: index,
   }));
 
-  await metaPromise;
-
   // Chunk upserts to avoid row limits
   const CHUNK_SIZE = 500;
   for (let i = 0; i < allChaptersData.length; i += CHUNK_SIZE) {
@@ -710,7 +744,7 @@ async function upsertNovelToBackend(novel: Novel, userId: string): Promise<void>
 }
 
 export async function syncNovel(novel: Novel): Promise<void> {
-  if (novel.sourceType === 'pdf' || novel.isLocalOnly) return;
+  if (novel.isLocalOnly) return;
   if (isNovelDeletedLocally(novel)) return;
   if (!isSyncEnabled()) return;
   if (!navigator.onLine) {
@@ -988,6 +1022,30 @@ export async function replayOfflineQueue(): Promise<void> {
               op.payload.chapterLocalId as string,
               op.payload.scrollPosition as number,
               op.payload.isLastRead as boolean,
+            );
+            break;
+          }
+          case 'uploadPdf': {
+            const novelId = op.payload.novelId as string;
+            const novel = getNovel(novelId);
+            if (!novel || novel.sourceType !== 'pdf' || !novel.isLocalOnly) break;
+            const userId = await getUserId();
+            if (!userId) break;
+            const storedDoc = await getPdfDocument(novelId);
+            if (!storedDoc) break;
+            const file = new File([storedDoc.blob], storedDoc.fileName, {
+              type: storedDoc.mimeType,
+              lastModified: new Date(storedDoc.createdAt).getTime(),
+            });
+            const location = await uploadPdfToCloud(novelId, userId, file);
+            await savePdfNovelMetadataToBackend(novel, userId, location);
+            saveNovel({ ...novel, isLocalOnly: false, storageBucket: location.bucket, storagePath: location.path });
+            break;
+          }
+          case 'deletePdfCloud': {
+            await deletePdfFromCloud(
+              op.payload.bucket as string,
+              op.payload.path as string,
             );
             break;
           }

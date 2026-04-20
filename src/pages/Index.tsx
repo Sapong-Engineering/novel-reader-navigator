@@ -26,7 +26,9 @@ import { useAppSettings } from '@/contexts/AppSettingsContext';
 import { useReadingLists } from '@/hooks/useReadingLists';
 import { isSyncEnabled } from '@/lib/notify';
 import { supabase } from '@/integrations/supabase/client';
-import { deletePdfNovelData } from '@/lib/pdf-store';
+import { deletePdfNovelData, getPdfDocument } from '@/lib/pdf-store';
+import { deletePdfFromCloud, uploadPdfToCloud, savePdfNovelMetadataToBackend } from '@/lib/pdf-cloud-store';
+import { enqueue } from '@/lib/offline-queue';
 import { importPdfFile, type PdfImportProgress } from '@/lib/pdf-import';
 import {
   deletionFromNovel,
@@ -229,10 +231,27 @@ const Index = () => {
       purgeNovelLocalData(existingNovel);
     }
     deleteNovel(id);
+
     if (existingNovel?.sourceType === 'pdf') {
+      // Always delete local IndexedDB blob
       void deletePdfNovelData(id).catch((err) => {
         console.error('Failed to delete local PDF data:', err);
       });
+
+      // If it was cloud-synced, also remove from Storage and write tombstone
+      if (existingNovel.storagePath && existingNovel.storageBucket && !existingNovel.isLocalOnly) {
+        if (navigator.onLine) {
+          void deletePdfFromCloud(existingNovel.storageBucket, existingNovel.storagePath).catch(
+            (err) => console.error('Failed to delete PDF from cloud:', err),
+          );
+        } else {
+          enqueue('deletePdfCloud', { bucket: existingNovel.storageBucket, path: existingNovel.storagePath });
+        }
+        const deletion = deletionFromNovel(existingNovel);
+        void syncDeleteNovel(deletion).finally(() => {
+          void refreshReadingLists();
+        });
+      }
     } else {
       const deletion = existingNovel
         ? deletionFromNovel(existingNovel)
@@ -241,20 +260,47 @@ const Index = () => {
         void refreshReadingLists();
       });
     }
+
     setLibrary(getLibrary());
     toast.success('Novel removed from library');
   }, [refreshReadingLists]);
+
+  const handleRetryUpload = useCallback(async (id: string) => {
+    if (!user) return;
+    const novel = getLibrary().find((n) => n.id === id);
+    if (!novel || novel.sourceType !== 'pdf' || !novel.isLocalOnly) return;
+    const storedDoc = await getPdfDocument(id);
+    if (!storedDoc) { toast.error('PDF file not found locally.'); return; }
+    try {
+      const file = new File([storedDoc.blob], storedDoc.fileName, { type: storedDoc.mimeType });
+      const location = await uploadPdfToCloud(id, user.id, file);
+      await savePdfNovelMetadataToBackend(novel, user.id, location);
+      saveNovel({ ...novel, isLocalOnly: false, storageBucket: location.bucket, storagePath: location.path });
+      setLibrary(getLibrary());
+      toast.success('PDF backed up to cloud.');
+    } catch (err) {
+      console.error('Retry upload failed:', err);
+      toast.error('Upload failed. Will retry when online.');
+      enqueue('uploadPdf', { novelId: id });
+    }
+  }, [user]);
 
   const handleImportPdf = useCallback(async (file: File) => {
     setIsImportingPdf(true);
     setPdfImportProgress(null);
 
     try {
-      const { novel } = await importPdfFile(file, setPdfImportProgress);
+      const { novel, uploadedToCloud } = await importPdfFile(file, user?.id ?? null, setPdfImportProgress);
       saveNovel(novel);
       setLibrary(getLibrary());
       navigate(`/reader/${novel.id}`);
-      toast.success(`Imported "${novel.title}" locally.`);
+      if (uploadedToCloud) {
+        toast.success(`Imported and backed up "${novel.title}" to the cloud.`);
+      } else {
+        toast.success(
+          `Imported "${novel.title}" locally.${user ? ' Will upload to cloud when online.' : ''}`,
+        );
+      }
     } catch (err) {
       console.error('Failed to import PDF:', err);
       toast.error(err instanceof Error ? err.message : 'Failed to import PDF');
@@ -262,7 +308,7 @@ const Index = () => {
       setIsImportingPdf(false);
       setPdfImportProgress(null);
     }
-  }, [navigate]);
+  }, [navigate, user]);
 
   const handleSignOut = useCallback(async () => {
     await signOut();
@@ -452,6 +498,7 @@ const Index = () => {
                 novel={novel}
                 onOpen={handleOpenNovel}
                 onDelete={handleDeleteNovel}
+                onRetryUpload={handleRetryUpload}
                 lists={readingLists.lists}
                 selectedListIds={readingLists.getNovelLists(novel.id)}
                 onToggleList={(listId, checked) => handleToggleList(listId, novel.id, checked)}
