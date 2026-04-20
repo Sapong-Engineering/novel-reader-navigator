@@ -31,7 +31,18 @@ export function enqueue(type: QueuedOperation['type'], payload: Record<string, u
   const queue = loadQueue();
   // Deduplicate: replace existing op with same type + key
   const key = dedupeKey(type, payload);
-  const filtered = queue.filter(op => dedupeKey(op.type, op.payload) !== key);
+  const localId = String(payload.localId ?? payload.novelId ?? '');
+  const filtered = queue.filter((op) => {
+    if (dedupeKey(op.type, op.payload) === key) return false;
+    if (type === 'deleteNovel' && op.type === 'syncNovel' && op.payload.novelId === localId) return false;
+    if (type === 'syncNovel' && op.type === 'deleteNovel' && op.payload.localId === localId) return false;
+    return true;
+  });
+
+  if (type === 'syncNovel' && queue.some(op => op.type === 'deleteNovel' && op.payload.localId === localId)) {
+    return;
+  }
+
   filtered.push({
     id: `${Date.now()}-${++idCounter}`,
     type,

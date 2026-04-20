@@ -28,6 +28,12 @@ import { isSyncEnabled } from '@/lib/notify';
 import { supabase } from '@/integrations/supabase/client';
 import { deletePdfNovelData } from '@/lib/pdf-store';
 import { importPdfFile, type PdfImportProgress } from '@/lib/pdf-import';
+import {
+  deletionFromNovel,
+  purgeNovelLocalData,
+  recordDeletedNovel,
+  removeDeletedNovelsFromLibrary,
+} from '@/lib/deleted-novels';
 
 // Lazy-load non-critical toolbar & tab components to reduce initial bundle
 const NovelSearch = lazy(() => import('@/components/NovelSearch'));
@@ -42,7 +48,7 @@ const Index = () => {
   const [isLoadingNovel, setIsLoadingNovel] = useState(false);
   const [isImportingPdf, setIsImportingPdf] = useState(false);
   const [pdfImportProgress, setPdfImportProgress] = useState<PdfImportProgress | null>(null);
-  const [library, setLibrary] = useState<Novel[]>(() => getLibrary());
+  const [library, setLibrary] = useState<Novel[]>(() => removeDeletedNovelsFromLibrary());
   const [isSyncing, setIsSyncing] = useState(false);
   const [isInitialSyncLoading, setIsInitialSyncLoading] = useState(false);
   const [isOnline, setIsOnline] = useState(navigator.onLine);
@@ -50,6 +56,21 @@ const Index = () => {
   const appSettings = useAppSettings();
   const [isAdmin, setIsAdmin] = useState(false);
   const readingLists = useReadingLists();
+  const refreshReadingLists = readingLists.refresh;
+
+  const syncLibrarySilently = useCallback(async () => {
+    if (!user || !appSettings.syncEnabled) return;
+    setIsSyncing(true);
+    try {
+      const novels = await syncLibraryFromBackend();
+      setLibrary(novels);
+      await refreshReadingLists();
+    } catch {
+      setLibrary(getLibrary());
+    } finally {
+      setIsSyncing(false);
+    }
+  }, [appSettings.syncEnabled, refreshReadingLists, user]);
 
   // Check admin role
   useEffect(() => {
@@ -91,6 +112,64 @@ const Index = () => {
     }
     if (!user) syncedRef.current = false;
   }, [user, authLoading, appSettings.syncEnabled]);
+
+  useEffect(() => {
+    if (!user || !appSettings.syncEnabled) return;
+
+    const handleFocusSync = () => {
+      if (document.visibilityState === 'visible' && navigator.onLine) {
+        void syncLibrarySilently();
+      }
+    };
+
+    window.addEventListener('focus', handleFocusSync);
+    document.addEventListener('visibilitychange', handleFocusSync);
+    return () => {
+      window.removeEventListener('focus', handleFocusSync);
+      document.removeEventListener('visibilitychange', handleFocusSync);
+    };
+  }, [appSettings.syncEnabled, syncLibrarySilently, user]);
+
+  useEffect(() => {
+    if (!user || !appSettings.syncEnabled) return;
+
+    const channel = supabase
+      .channel(`library-deletions:${user.id}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'novel_deletions',
+          filter: `user_id=eq.${user.id}`,
+        },
+        (payload) => {
+          const deletion = payload.new as {
+            local_id?: string;
+            url?: string | null;
+            title?: string | null;
+            deleted_at?: string;
+            source?: string;
+          };
+          if (!deletion.local_id || !deletion.deleted_at) return;
+          recordDeletedNovel({
+            localId: deletion.local_id,
+            url: deletion.url,
+            title: deletion.title,
+            deletedAt: deletion.deleted_at,
+            source: deletion.source ?? 'sync',
+          });
+          const novels = removeDeletedNovelsFromLibrary();
+          setLibrary(novels);
+          void refreshReadingLists();
+        },
+      )
+      .subscribe();
+
+    return () => {
+      void supabase.removeChannel(channel);
+    };
+  }, [appSettings.syncEnabled, refreshReadingLists, user]);
 
   const handleFetchNovel = useCallback(async (url: string) => {
     const existing = library.find(n => n.url === url);
@@ -146,17 +225,25 @@ const Index = () => {
 
   const handleDeleteNovel = useCallback((id: string) => {
     const existingNovel = getLibrary().find((novel) => novel.id === id);
+    if (existingNovel) {
+      purgeNovelLocalData(existingNovel);
+    }
     deleteNovel(id);
     if (existingNovel?.sourceType === 'pdf') {
       void deletePdfNovelData(id).catch((err) => {
         console.error('Failed to delete local PDF data:', err);
       });
     } else {
-      void syncDeleteNovel(id);
+      const deletion = existingNovel
+        ? deletionFromNovel(existingNovel)
+        : recordDeletedNovel({ localId: id, source: 'user' });
+      void syncDeleteNovel(deletion).finally(() => {
+        void refreshReadingLists();
+      });
     }
     setLibrary(getLibrary());
     toast.success('Novel removed from library');
-  }, []);
+  }, [refreshReadingLists]);
 
   const handleImportPdf = useCallback(async (file: File) => {
     setIsImportingPdf(true);
@@ -189,13 +276,14 @@ const Index = () => {
     try {
       const novels = await syncLibraryFromBackend();
       setLibrary(novels);
+      await refreshReadingLists();
       toast.success('Library synced!');
     } catch {
       toast.error('Sync failed');
     } finally {
       setIsSyncing(false);
     }
-  }, [user]);
+  }, [refreshReadingLists, user]);
 
   const handleToggleList = useCallback((listId: string, novelId: string, checked: boolean) => {
     if (checked) {

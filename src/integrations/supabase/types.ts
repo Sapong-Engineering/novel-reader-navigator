@@ -200,6 +200,45 @@ export type Database = {
         }
         Relationships: []
       }
+      novel_deletions: {
+        Row: {
+          created_at: string
+          deleted_at: string
+          deleted_by: string | null
+          id: string
+          local_id: string
+          source: string
+          title: string | null
+          updated_at: string
+          url: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          deleted_at?: string
+          deleted_by?: string | null
+          id?: string
+          local_id: string
+          source?: string
+          title?: string | null
+          updated_at?: string
+          url?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          deleted_at?: string
+          deleted_by?: string | null
+          id?: string
+          local_id?: string
+          source?: string
+          title?: string | null
+          updated_at?: string
+          url?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           created_at: string

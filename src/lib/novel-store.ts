@@ -66,6 +66,10 @@ export function getLibrary(): Novel[] {
   }
 }
 
+export function saveLibrary(library: Novel[]): void {
+  safePersist(STORAGE_KEY, JSON.stringify(library));
+}
+
 export function saveNovel(novel: Novel): void {
   const library = getLibrary();
   const index = library.findIndex(n => n.id === novel.id);
@@ -83,7 +87,7 @@ export function getNovel(id: string): Novel | undefined {
 
 export function deleteNovel(id: string): void {
   const library = getLibrary().filter(n => n.id !== id);
-  safePersist(STORAGE_KEY, JSON.stringify(library));
+  saveLibrary(library);
 }
 
 export function generateId(): string {

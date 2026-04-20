@@ -36,6 +36,7 @@ interface AdminProfileRow {
 interface AdminNovelRow {
   id: string;
   user_id: string;
+  local_id: string;
   title: string;
   url: string;
   cover_url: string | null;
@@ -220,7 +221,42 @@ Deno.serve(async (req) => {
       case 'delete-novel': {
         const { novelId } = params;
         if (!novelId) throw new Error('novelId required');
-        // Delete chapters first, then novel
+
+        const { data: novel, error: novelLookupError } = await adminClient
+          .from('novels')
+          .select('id,user_id,local_id,title,url')
+          .eq('id', novelId)
+          .maybeSingle();
+        if (novelLookupError) throw novelLookupError;
+        if (!novel) {
+          result = { success: true };
+          break;
+        }
+
+        const deletedAt = new Date().toISOString();
+        const { error: tombstoneError } = await adminClient
+          .from('novel_deletions')
+          .upsert({
+            user_id: novel.user_id,
+            local_id: novel.local_id,
+            url: novel.url,
+            title: novel.title,
+            deleted_at: deletedAt,
+            deleted_by: user.id,
+            source: 'admin',
+            updated_at: deletedAt,
+          }, { onConflict: 'user_id,local_id' });
+        if (tombstoneError) throw tombstoneError;
+
+        const { error: listItemError } = await adminClient
+          .from('reading_list_items')
+          .delete()
+          .eq('user_id', novel.user_id)
+          .eq('novel_local_id', novel.local_id);
+        if (listItemError) throw listItemError;
+
+        // Delete chapters first, then novel. Tombstone above prevents stale devices
+        // from treating the missing row as a local-only novel to re-upload.
         await adminClient.from('chapters').delete().eq('novel_id', novelId);
         await adminClient.from('bookmarks').delete().eq('novel_id', novelId);
         await adminClient.from('reading_progress').delete().eq('novel_id', novelId);

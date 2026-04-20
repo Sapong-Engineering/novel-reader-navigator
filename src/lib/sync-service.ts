@@ -1,6 +1,6 @@
 import { supabase } from '@/integrations/supabase/client';
 import type { Tables, TablesInsert } from '@/integrations/supabase/types';
-import { type Novel, type Chapter, getLibrary, saveNovel, getNovel } from './novel-store';
+import { type Novel, type Chapter, getLibrary, saveLibrary, saveNovel, getNovel } from './novel-store';
 import {
   getBookmarks,
   setBookmarks,
@@ -11,11 +11,23 @@ import { setSyncStatus } from '@/hooks/useSyncStatus';
 import { enqueue, dequeue, getQueueLength, onConnectivityChange } from './offline-queue';
 import { compareChapterOrder, orderChapters } from './chapter-order';
 import { isSyncEnabled } from './notify';
+import {
+  filterDeletedNovels,
+  getDeletedNovels,
+  isNovelDeletedBy,
+  isNovelDeletedLocally,
+  normalizeDeletion,
+  purgeNovelLocalData,
+  recordDeletedNovel,
+  type DeletedNovel,
+  type NovelDeletionInput,
+} from './deleted-novels';
 
 type NovelRow = Tables<'novels'>;
 type ChapterRow = Tables<'chapters'>;
 type ChapterMetadataRow = Pick<ChapterRow, 'id' | 'novel_id' | 'local_id' | 'title' | 'url' | 'saved_at' | 'sort_order'>;
 type BookmarkRow = Tables<'bookmarks'>;
+type NovelDeletionRow = Tables<'novel_deletions'>;
 
 // ── Paginated fetch helper (bypasses 1000-row limit) ──
 
@@ -349,6 +361,7 @@ async function resolveOrCreateNovelUuid(localId: string, userId: string): Promis
 
   const novel = getNovel(localId);
   if (!novel) return null;
+  if (isNovelDeletedLocally(novel)) return null;
   return getOrCreateNovelId(localId, userId, novel);
 }
 
@@ -388,6 +401,88 @@ async function fetchBookmarkRowsFromBackend(novelUuid: string, userId: string): 
   return data ?? [];
 }
 
+// ── Deletion tombstones ──
+
+function toLocalDeletion(row: NovelDeletionRow): DeletedNovel {
+  return {
+    localId: row.local_id,
+    url: row.url,
+    title: row.title,
+    deletedAt: row.deleted_at,
+    source: row.source,
+  };
+}
+
+function toDeletionInput(input: string | Novel | NovelDeletionInput): NovelDeletionInput {
+  if (typeof input === 'string') {
+    const novel = getNovel(input);
+    return novel
+      ? { localId: novel.id, url: novel.url, title: novel.title, source: 'user' }
+      : { localId: input, source: 'user' };
+  }
+
+  if ('id' in input) {
+    return {
+      localId: input.id,
+      url: input.url,
+      title: input.title,
+      deletedAt: new Date().toISOString(),
+      source: 'user',
+    };
+  }
+
+  return input;
+}
+
+async function fetchDeletionRowsFromBackend(userId: string): Promise<NovelDeletionRow[]> {
+  const { data, error } = await supabase
+    .from('novel_deletions')
+    .select('*')
+    .eq('user_id', userId);
+
+  if (error) throw error;
+  return data ?? [];
+}
+
+async function upsertNovelDeletionToBackend(
+  deletion: DeletedNovel,
+  userId: string,
+  deletedBy: string | null = userId,
+): Promise<void> {
+  const { error } = await supabase
+    .from('novel_deletions')
+    .upsert({
+      user_id: userId,
+      local_id: deletion.localId,
+      url: deletion.url ?? null,
+      title: deletion.title ?? null,
+      deleted_at: deletion.deletedAt,
+      deleted_by: deletedBy,
+      source: deletion.source ?? 'user',
+      updated_at: new Date().toISOString(),
+    }, { onConflict: 'user_id,local_id' });
+
+  if (error) throw error;
+}
+
+async function deleteRemoteNovelRows(localId: string, userId: string): Promise<void> {
+  novelUuidCache.delete(localId);
+
+  await supabase
+    .from('reading_list_items')
+    .delete()
+    .eq('novel_local_id', localId)
+    .eq('user_id', userId);
+
+  const { error } = await supabase
+    .from('novels')
+    .delete()
+    .eq('local_id', localId)
+    .eq('user_id', userId);
+
+  if (error) throw error;
+}
+
 // ── Novels ──
 
 export async function syncLibraryFromBackend(): Promise<Novel[]> {
@@ -399,7 +494,7 @@ export async function syncLibraryFromBackend(): Promise<Novel[]> {
   try {
     // Fetch novels and chapter METADATA only (skip content for speed)
     // Use paginated fetch to bypass the 1000-row default limit
-    const [remoteNovels, remoteChapters] = await Promise.all([
+    const [remoteNovels, remoteChapters, remoteDeletions] = await Promise.all([
       fetchAllRows<NovelRow>(() =>
         supabase.from('novels').select('*').eq('user_id', userId),
       ),
@@ -409,20 +504,46 @@ export async function syncLibraryFromBackend(): Promise<Novel[]> {
           .select('id,novel_id,local_id,title,url,saved_at,sort_order')
           .eq('user_id', userId),
       ),
+      fetchDeletionRowsFromBackend(userId),
     ]);
+
+    for (const deletion of remoteDeletions.map(toLocalDeletion)) {
+      recordDeletedNovel(deletion);
+    }
+    const deletionIndex = getDeletedNovels();
+
+    const originalLocalLibrary = getLibrary();
+    const localLibrary = filterDeletedNovels(originalLocalLibrary, deletionIndex);
+    if (localLibrary.length !== originalLocalLibrary.length) {
+      for (const novel of originalLocalLibrary) {
+        if (isNovelDeletedBy(novel, deletionIndex)) purgeNovelLocalData(novel);
+      }
+      saveLibrary(localLibrary);
+    }
 
     // Populate UUID cache
     for (const rn of remoteNovels) {
+      if (isNovelDeletedBy(
+        { id: rn.local_id, url: rn.url, savedAt: rn.saved_at },
+        deletionIndex,
+      )) {
+        continue;
+      }
       novelUuidCache.set(rn.local_id, rn.id);
     }
 
     if (!remoteNovels.length) {
-      const local = getLibrary();
-      if (local.length > 0) {
-        await Promise.all(local.map(novel => upsertNovelToBackend(novel, userId)));
+      const uploadableLocal = localLibrary.filter(novel =>
+        novel.sourceType !== 'pdf' &&
+        !novel.isLocalOnly &&
+        !isNovelDeletedBy(novel, deletionIndex),
+      );
+      if (uploadableLocal.length > 0) {
+        await Promise.all(uploadableLocal.map(novel => upsertNovelToBackend(novel, userId)));
       }
+      saveLibrary(localLibrary);
       setSyncStatus('done');
-      return local;
+      return localLibrary;
     }
 
     // Build chapter lookup by novel_id
@@ -433,12 +554,18 @@ export async function syncLibraryFromBackend(): Promise<Novel[]> {
       chaptersByNovelId.set(c.novel_id, arr);
     }
 
-    const localLibrary = getLibrary();
     const localMap = new Map(localLibrary.map(n => [n.id, n]));
     const mergedNovels: Novel[] = [];
     const seenLocalIds = new Set<string>();
 
     for (const rn of remoteNovels) {
+      if (isNovelDeletedBy(
+        { id: rn.local_id, url: rn.url, savedAt: rn.saved_at },
+        deletionIndex,
+      )) {
+        continue;
+      }
+
       seenLocalIds.add(rn.local_id);
       const rawChapters = chaptersByNovelId.get(rn.id) ?? [];
       // Primary order from backend sort_order, with natural chapter-order tie-breaks
@@ -475,7 +602,13 @@ export async function syncLibraryFromBackend(): Promise<Novel[]> {
 
     // Push local-only novels to backend
     const seenUrls = new Set(mergedNovels.map(n => n.url));
-    const localOnly = localLibrary.filter(n => !seenLocalIds.has(n.id) && !seenUrls.has(n.url));
+    const localOnly = localLibrary.filter(n =>
+      n.sourceType !== 'pdf' &&
+      !n.isLocalOnly &&
+      !seenLocalIds.has(n.id) &&
+      !seenUrls.has(n.url) &&
+      !isNovelDeletedBy(n, deletionIndex),
+    );
     if (localOnly.length > 0) {
       await Promise.all(localOnly.map(novel => upsertNovelToBackend(novel, userId)));
       mergedNovels.push(...localOnly);
@@ -497,7 +630,9 @@ export async function syncLibraryFromBackend(): Promise<Novel[]> {
     }
 
     setSyncStatus('done');
-    return Array.from(urlMap.values());
+    const syncedLibrary = Array.from(urlMap.values());
+    saveLibrary(syncedLibrary);
+    return syncedLibrary;
   } catch (err) {
     setSyncStatus('error');
     console.error('Sync failed, using local data:', err);
@@ -534,6 +669,7 @@ function mergeChapters(local: Chapter[], remote: Chapter[]): Chapter[] {
 }
 
 async function upsertNovelToBackend(novel: Novel, userId: string): Promise<void> {
+  if (novel.sourceType === 'pdf' || novel.isLocalOnly || isNovelDeletedLocally(novel)) return;
   const novelUuid = await getOrCreateNovelId(novel.id, userId, novel);
 
   // Update metadata
@@ -575,6 +711,7 @@ async function upsertNovelToBackend(novel: Novel, userId: string): Promise<void>
 
 export async function syncNovel(novel: Novel): Promise<void> {
   if (novel.sourceType === 'pdf' || novel.isLocalOnly) return;
+  if (isNovelDeletedLocally(novel)) return;
   if (!isSyncEnabled()) return;
   if (!navigator.onLine) {
     enqueue('syncNovel', { novelId: novel.id });
@@ -594,10 +731,11 @@ export async function syncNovel(novel: Novel): Promise<void> {
   }
 }
 
-export async function syncDeleteNovel(localId: string): Promise<void> {
+export async function syncDeleteNovel(input: string | Novel | NovelDeletionInput): Promise<void> {
+  const deletion = recordDeletedNovel(toDeletionInput(input));
   if (!isSyncEnabled()) return;
   if (!navigator.onLine) {
-    enqueue('deleteNovel', { localId });
+    enqueue('deleteNovel', deletion);
     setSyncStatus('idle');
     return;
   }
@@ -605,16 +743,12 @@ export async function syncDeleteNovel(localId: string): Promise<void> {
   if (!userId) return;
   setSyncStatus('syncing');
   try {
-    novelUuidCache.delete(localId);
-    await supabase
-      .from('novels')
-      .delete()
-      .eq('local_id', localId)
-      .eq('user_id', userId);
+    await upsertNovelDeletionToBackend(deletion, userId);
+    await deleteRemoteNovelRows(deletion.localId, userId);
     setSyncStatus('done');
   } catch (err) {
     setSyncStatus('error');
-    enqueue('deleteNovel', { localId });
+    enqueue('deleteNovel', deletion);
     console.error('Failed to delete novel from backend:', err);
   }
 }
@@ -822,7 +956,7 @@ export async function replayOfflineQueue(): Promise<void> {
         switch (op.type) {
           case 'syncNovel': {
             const novel = getNovel(op.payload.novelId as string);
-            if (novel) {
+            if (novel && !isNovelDeletedLocally(novel)) {
               const userId = await getUserId();
               if (userId) await upsertNovelToBackend(novel, userId);
             }
@@ -831,9 +965,15 @@ export async function replayOfflineQueue(): Promise<void> {
           case 'deleteNovel': {
             const userId = await getUserId();
             if (userId) {
-              const localId = op.payload.localId as string;
-              novelUuidCache.delete(localId);
-              await supabase.from('novels').delete().eq('local_id', localId).eq('user_id', userId);
+              const deletion = recordDeletedNovel(normalizeDeletion({
+                localId: op.payload.localId as string,
+                url: op.payload.url as string | null | undefined,
+                title: op.payload.title as string | null | undefined,
+                deletedAt: op.payload.deletedAt as string | undefined,
+                source: (op.payload.source as string | undefined) ?? 'user',
+              }));
+              await upsertNovelDeletionToBackend(deletion, userId);
+              await deleteRemoteNovelRows(deletion.localId, userId);
             }
             break;
           }
