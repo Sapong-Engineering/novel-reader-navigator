@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import NovelUrlInput from '@/components/NovelUrlInput';
 import NovelCard from '@/components/NovelCard';
+import PdfUploadInput from '@/components/pdf/PdfUploadInput';
 import { scrapeNovelInfo } from '@/lib/api/firecrawl';
 import {
   type Novel,
@@ -15,7 +16,7 @@ import {
 import { syncLibraryFromBackend, syncNovel, syncDeleteNovel } from '@/lib/sync-service';
 import { orderChapters } from '@/lib/chapter-order';
 import { useAuth } from '@/hooks/useAuth';
-import { BookOpen, LogOut, LogIn, Loader2, WifiOff, RefreshCw, Shield, Search as SearchIcon, Link as LinkIcon } from 'lucide-react';
+import { BookOpen, LogOut, LogIn, Loader2, WifiOff, RefreshCw, Shield, Search as SearchIcon, Link as LinkIcon, FileText } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
 import SyncIndicator from '@/components/SyncIndicator';
@@ -25,6 +26,8 @@ import { useAppSettings } from '@/contexts/AppSettingsContext';
 import { useReadingLists } from '@/hooks/useReadingLists';
 import { isSyncEnabled } from '@/lib/notify';
 import { supabase } from '@/integrations/supabase/client';
+import { deletePdfNovelData } from '@/lib/pdf-store';
+import { importPdfFile, type PdfImportProgress } from '@/lib/pdf-import';
 
 // Lazy-load non-critical toolbar & tab components to reduce initial bundle
 const NovelSearch = lazy(() => import('@/components/NovelSearch'));
@@ -37,6 +40,8 @@ const Index = () => {
   const navigate = useNavigate();
   const { user, loading: authLoading, signOut } = useAuth();
   const [isLoadingNovel, setIsLoadingNovel] = useState(false);
+  const [isImportingPdf, setIsImportingPdf] = useState(false);
+  const [pdfImportProgress, setPdfImportProgress] = useState<PdfImportProgress | null>(null);
   const [library, setLibrary] = useState<Novel[]>(() => getLibrary());
   const [isSyncing, setIsSyncing] = useState(false);
   const [isInitialSyncLoading, setIsInitialSyncLoading] = useState(false);
@@ -140,11 +145,37 @@ const Index = () => {
   }, [navigate]);
 
   const handleDeleteNovel = useCallback((id: string) => {
+    const existingNovel = getLibrary().find((novel) => novel.id === id);
     deleteNovel(id);
-    syncDeleteNovel(id);
+    if (existingNovel?.sourceType === 'pdf') {
+      void deletePdfNovelData(id).catch((err) => {
+        console.error('Failed to delete local PDF data:', err);
+      });
+    } else {
+      void syncDeleteNovel(id);
+    }
     setLibrary(getLibrary());
     toast.success('Novel removed from library');
   }, []);
+
+  const handleImportPdf = useCallback(async (file: File) => {
+    setIsImportingPdf(true);
+    setPdfImportProgress(null);
+
+    try {
+      const { novel } = await importPdfFile(file, setPdfImportProgress);
+      saveNovel(novel);
+      setLibrary(getLibrary());
+      navigate(`/reader/${novel.id}`);
+      toast.success(`Imported "${novel.title}" locally.`);
+    } catch (err) {
+      console.error('Failed to import PDF:', err);
+      toast.error(err instanceof Error ? err.message : 'Failed to import PDF');
+    } finally {
+      setIsImportingPdf(false);
+      setPdfImportProgress(null);
+    }
+  }, [navigate]);
 
   const handleSignOut = useCallback(async () => {
     await signOut();
@@ -245,6 +276,9 @@ const Index = () => {
               <TabsTrigger value="search" className="flex-1 gap-1.5">
                 <SearchIcon className="w-3.5 h-3.5" /> Search Novels
               </TabsTrigger>
+              <TabsTrigger value="pdf" className="flex-1 gap-1.5">
+                <FileText className="w-3.5 h-3.5" /> Upload PDF
+              </TabsTrigger>
             </TabsList>
             <TabsContent value="url">
               <NovelUrlInput onSubmit={handleFetchNovel} isLoading={isLoadingNovel} />
@@ -253,6 +287,13 @@ const Index = () => {
               <Suspense fallback={<div className="flex justify-center py-8"><Loader2 className="w-5 h-5 animate-spin text-muted-foreground" /></div>}>
                 <NovelSearch onAddNovel={handleFetchNovel} isAddingNovel={isLoadingNovel} />
               </Suspense>
+            </TabsContent>
+            <TabsContent value="pdf">
+              <PdfUploadInput
+                onSelectFile={handleImportPdf}
+                isLoading={isImportingPdf}
+                progress={pdfImportProgress}
+              />
             </TabsContent>
           </Tabs>
         </div>

@@ -574,6 +574,7 @@ async function upsertNovelToBackend(novel: Novel, userId: string): Promise<void>
 }
 
 export async function syncNovel(novel: Novel): Promise<void> {
+  if (novel.sourceType === 'pdf' || novel.isLocalOnly) return;
   if (!isSyncEnabled()) return;
   if (!navigator.onLine) {
     enqueue('syncNovel', { novelId: novel.id });

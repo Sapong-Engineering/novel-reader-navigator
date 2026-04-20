@@ -1,12 +1,17 @@
 // Local storage based novel store
 import { toast } from 'sonner';
 
+export type NovelSourceType = 'web' | 'pdf';
+
 export interface Chapter {
   id: string;
   title: string;
   url: string;
   content?: string;
   savedAt?: string;
+  pageStart?: number;
+  pageEnd?: number;
+  sourceType?: NovelSourceType;
 }
 
 export interface Novel {
@@ -17,6 +22,13 @@ export interface Novel {
   description?: string;
   chapters: Chapter[];
   savedAt: string;
+  sourceType?: NovelSourceType;
+  readerMode?: 'text' | 'pdf';
+  sourceFileName?: string;
+  sourceFileSize?: number;
+  pageCount?: number;
+  storageKey?: string;
+  isLocalOnly?: boolean;
 }
 
 const STORAGE_KEY = 'novel-reader-library';
@@ -76,4 +88,8 @@ export function deleteNovel(id: string): void {
 
 export function generateId(): string {
   return crypto.randomUUID();
+}
+
+export function isPdfNovel(novel: Novel | null | undefined): novel is Novel {
+  return novel?.sourceType === 'pdf';
 }

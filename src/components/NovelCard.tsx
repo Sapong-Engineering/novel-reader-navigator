@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Book, Trash2, BookOpen } from 'lucide-react';
+import { Trash2, BookOpen, FileText } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   AlertDialog,
@@ -30,6 +30,10 @@ const NovelCard = ({ novel, onOpen, onDelete, lists = [], selectedListIds = [], 
   const [dialogOpen, setDialogOpen] = useState(false);
   const savedCount = novel.chapters.filter(c => c.content).length;
   const savedDate = new Date(novel.savedAt).toLocaleDateString();
+  const isPdf = novel.sourceType === 'pdf';
+  const subtitle = isPdf
+    ? `${novel.pageCount ? `${novel.pageCount} pages` : 'PDF document'} · ${savedDate}`
+    : `${savedCount}/${novel.chapters.length} chapters · ${savedDate}`;
 
   return (
     <div className="group relative bg-card border border-border rounded-xl overflow-hidden hover:shadow-lg transition-all duration-200">
@@ -56,11 +60,19 @@ const NovelCard = ({ novel, onOpen, onDelete, lists = [], selectedListIds = [], 
 
       {/* Info */}
       <div className="p-3">
-        <h3 className="font-sans-ui font-semibold text-sm truncate text-foreground">
-          {novel.title}
-        </h3>
+        <div className="flex items-center gap-2">
+          <h3 className="font-sans-ui font-semibold text-sm truncate text-foreground flex-1">
+            {novel.title}
+          </h3>
+          {isPdf && (
+            <span className="inline-flex items-center gap-1 rounded-full bg-secondary px-2 py-0.5 text-[10px] font-sans-ui font-medium uppercase tracking-wide text-muted-foreground">
+              <FileText className="w-3 h-3" aria-hidden="true" />
+              PDF
+            </span>
+          )}
+        </div>
         <p className="text-xs text-muted-foreground font-sans-ui mt-1">
-          {savedCount}/{novel.chapters.length} chapters · {savedDate}
+          {subtitle}
         </p>
       </div>
 
